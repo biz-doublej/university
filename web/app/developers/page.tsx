@@ -10,9 +10,6 @@ type ListKeyItem = { id: number; name: string; key_prefix: string; active: boole
 export default function DevelopersPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [tenantNameSignup, setTenantNameSignup] = useState("");
   const [tenantName, setTenantName] = useState("Demo School");
   const [tenantId, setTenantId] = useState<number | null>(null);
 
@@ -31,53 +28,7 @@ export default function DevelopersPage() {
     if (t) setAuthToken(t);
   }, []);
 
-  const signup = async () => {
-    setLoading(true);
-    setMsg("");
-    try {
-      const r = await fetch(`${API_BASE}/v1/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, tenant_name: tenantNameSignup || "My School" }),
-      });
-      const j: any = await r.json();
-      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
-      localStorage.setItem("tma_token", j.token);
-      setAuthToken(j.token);
-      setMsg("회원가입 및 로그인 완료");
-    } catch (e: any) {
-      setMsg(`Signup error: ${e.message || e}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const login = async () => {
-    setLoading(true);
-    setMsg("");
-    try {
-      const r = await fetch(`${API_BASE}/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const j: any = await r.json();
-      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
-      localStorage.setItem("tma_token", j.token);
-      setAuthToken(j.token);
-      setMsg("로그인 완료");
-    } catch (e: any) {
-      setMsg(`Login error: ${e.message || e}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem("tma_token");
-    setAuthToken(null);
-    setMsg("로그아웃되었습니다.");
-  };
+  // Auth flows removed from Developers page; use header buttons
 
   const createTenant = async () => {
     setLoading(true);
@@ -144,21 +95,13 @@ export default function DevelopersPage() {
       <h1 className="text-xl font-semibold">개발자 센터 (Developer Center)</h1>
       <div className="text-sm text-white/80">요금제 없이 API 키를 발급받아 백엔드 API를 호출할 수 있습니다.</div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card space-y-3">
-          <div className="font-medium">0) 회원가입 / 로그인</div>
-          <input className="input" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="input" type="password" placeholder="비밀번호(8자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <div className="grid grid-cols-2 gap-2">
-            <input className="input" placeholder="테넌트 이름(회원가입 시)" value={tenantNameSignup} onChange={(e) => setTenantNameSignup(e.target.value)} />
-            <div className="flex gap-2">
-              <button className="btn" onClick={signup} disabled={loading}>회원가입</button>
-              <button className="btn" onClick={login} disabled={loading}>로그인</button>
-              {authToken && <button className="btn" onClick={logout}>로그아웃</button>}
-            </div>
-          </div>
-          {authToken && <div className="text-sm text-white/70">로그인됨</div>}
+      {!authToken && (
+        <div className="card text-sm text-white/80">
+          프로젝트/키 관리는 로그인이 필요합니다. 상단 우측의 Login/Sign up 버튼을 사용하세요.
         </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
         {/* 기존 Admin 경로(선택 사용): 필요 시 사용 */}
         {/* <div className="card space-y-3">
           <div className="font-medium">(관리자) 테넌트 생성</div>

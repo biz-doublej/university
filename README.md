@@ -1,10 +1,20 @@
-# 📘 설계서 v1 — "CampusOps AI" (실습실·강의실 자동배정 & 공실활용 플랫폼)
+# 📘 설계서 v1 — "Timora AI" (실습실·강의실 자동배정 & 공실활용 플랫폼)
 
 **작성자:** Gabriel (Full‑Stack)
 **작성일:** 2025‑09‑15 (Asia/Seoul)
 **버전:** v1.0
 
-> 단일 AI 제품으로 다기관 판매/도입을 전제로 한 **멀티테넌트** 아키텍처, **제약기반 자동배정(OR‑Tools)**, **공실 분석 & 외부 대여 연동**, **설명가능 Co‑pilot**을 포함한 상용 설계서입니다.
+> "시간을 밝히는 AI, 캠퍼스를 효율적으로" — Timora AI
+>
+> 단일 AI 제품으로 다기관 판매/도입을 전제로 한 **멀티테넌트** 아키텍처, **제약기반 자동배정(OR‑Tools)**, **실시간 공실 분석 & 활용률 시각화**, **공실 기반 외부 대여 연동**, **설명가능 Co‑pilot**을 포함한 상용 설계서입니다.
+
+---
+
+## Timora의 핵심 목표 (우선 적용)
+
+1. 실습실 및 실습센터 시간표 자동 배정 시스템 구축
+2. 실시간 공실 분석 체계 및 활용률 시각화
+3. 공실 기반 외부 대여 관리시스템 연동
 
 ---
 
@@ -120,6 +130,9 @@ exceptions:
 * `GET /v1/timetable/rooms?week=YYYY-WW`
 * `PATCH /v1/assignments/{id}` {room\_id,timeslot\_id,status}
 * `GET /v1/vacancy/heatmap?week=YYYY-WW&building=`
+  * 실시간 공실 비율 히트맵(요일/시간대별) — 테넌트/건물 필터 지원
+* `GET /v1/vacancy/available?day=Mon&start=09:00&end=10:00&building=`
+  * 외부 대여 연동용: 특정 구간에 이용 가능한 강의실 목록 반환
 * `POST /v1/calendar/publish?room_id=` → {sharing\_url}
 * Webhooks: `assignment.updated`, `calendar.published`
 
@@ -195,7 +208,7 @@ exceptions:
 
 * **에디션**: Essentials(자동배정/대시보드), Pro(캘린더 발행/Co‑pilot), Enterprise(온프레/전용 DB/ISMS 지원)
 * **가격**: 섹션/실습실 수 기준 티어 + 사용자 좌석 추가. 온프레는 연 구독 + 설치 비용.
-* **백라벨**: 로고/도메인/테마 커스터마이징, "Powered by CampusOps AI" 옵션.
+* **백라벨**: 로고/도메인/테마 커스터마이징, "Powered by Timora AI" 옵션.
 
 ---
 

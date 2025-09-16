@@ -30,64 +30,8 @@ function normalizeHeader(h: string): string {
   return h.replace(/["'\s\n\r\t]/g, "");
 }
 
-const headerMap: Array<{ re: RegExp; key: string }> = [
-  { re: /^(순번|no|index)$/i, key: "idx" },
-  { re: /(과정|program)/i, key: "program" },
-  { re: /(개설학과|학과|department)/i, key: "department" },
-  { re: /(교과목.*코드|과목코드|code)/i, key: "course_code" },
-  { re: /(교과목명|과목명|name|title)/i, key: "course_name" },
-  { re: /(개설\s*학년|학년|grade)/i, key: "grade" },
-  { re: /(수강\s*분반|분반|section)/i, key: "section" },
-  { re: /(영역구분)/i, key: "category" },
-  { re: /(수강\s*인원|수강인원|enrolled|등록인원)/i, key: "enrolled" },
-  { re: /(제한\s*인원|정원|limit|capacity)/i, key: "limit" },
-  { re: /(개설강좌\s*구분)/i, key: "course_type" },
-  { re: /(주야\s*구분)/i, key: "daynight" },
-  { re: /(개설강좌\s*상태구분|상태)/i, key: "status" },
-  { re: /(강좌\s*대표교수)/i, key: "lead_prof" },
-  { re: /(강좌\s*담당교수|담당교수|교강사|instructor)/i, key: "instructor" },
-  { re: /(수업진행구분)/i, key: "progress_type" },
-  { re: /(수업\s*주수)/i, key: "weeks" },
-  { re: /(교과목\s*학점|학점|credits)/i, key: "credits" },
-  { re: /(강의유형\s*구분)/i, key: "class_type" },
-  { re: /(교과목\s*구분)/i, key: "subject_type" },
-  { re: /(성적부여\s*방법구분)/i, key: "grading" },
-  { re: /(타교강좌\s*구분)/i, key: "external" },
-  { re: /(건물명)/i, key: "building" },
-  { re: /(호실번호)/i, key: "room_no" },
-  { re: /(강의실명|교육공간명)/i, key: "room_name" },
-  { re: /(수업시간표.*요약)/i, key: "timeslot" },
-  { re: /(합반분반구분)/i, key: "combined_section" },
-  { re: /(학습.*실습.*운영계획서.*조회)/i, key: "plan_url" },
-];
-
-function mapHeaders(headers: string[]): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const h of headers) {
-    const norm = normalizeHeader(h);
-    const hit = headerMap.find((m) => m.re.test(norm));
-    if (hit) result[h] = hit.key;
-    else result[h] = norm; // fallback to normalized
-  }
-  return result;
-}
-
-function takeColumns(row: any) {
-  // Select a useful subset for the table
-  return {
-    department: row.department ?? null,
-    course_code: row.course_code ?? null,
-    course_name: row.course_name ?? null,
-    grade: row.grade ?? null,
-    section: row.section ?? null,
-    enrolled: row.enrolled ?? null,
-    limit: row.limit ?? row.capacity ?? null,
-    instructor: row.instructor ?? row.lead_prof ?? null,
-    building: row.building ?? null,
-    room: row.room_name ?? row.room_no ?? null,
-    timeslot: row.timeslot ?? null,
-  };
-}
+// We previously mapped headers to canonical keys and selected a subset.
+// For the user's request, return ALL columns with original header labels as keys.
 
 function parseCSV(text: string): any[] {
   const lines = text.split(/\r?\n/);
@@ -144,7 +88,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const limit = Math.max(0, Math.min(parseInt(searchParams.get("limit") || "500", 10), 5000));
+    const limit = Math.max(0, Math.min(parseInt(searchParams.get("limit") || "1500", 10), 5000));
     const ext = path.extname(filePath).toLowerCase();
 
     let rows: any[] = [];
@@ -165,7 +109,7 @@ export async function GET(request: Request) {
       }
       const wb = XLSX.readFile(filePath);
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });
+      const raw = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Array<Record<string, any>>;
       rows = raw as any[];
     }
 
@@ -173,21 +117,39 @@ export async function GET(request: Request) {
       return NextResponse.json({ file: path.basename(filePath), items: [], columns: [] });
     }
 
-    // Header mapping using keys of first row
-    const headers = Object.keys(rows[0]);
-    const map = mapHeaders(headers);
-    const mapped = rows.map((r) => {
-      const o: Record<string, any> = {};
-      for (const [orig, v] of Object.entries(r)) {
-        const key = map[orig as string] || orig;
-        o[key] = v;
-      }
-      return takeColumns(o);
-    });
+    // Use raw headers from file and include all columns
+    const headers = Object.keys(rows[0] || {});
+    const items = rows.slice(0, limit);
 
-    const items = mapped.slice(0, limit);
-    const columns = Object.keys(items[0] || {});
-    return NextResponse.json({ file: path.basename(filePath), count: items.length, columns, items });
+    // Extract Building/Room No/Room Name columns if present
+    const findHeader = (re: RegExp) => headers.find((h) => re.test(normalizeHeader(h)));
+    const buildingH = findHeader(/(건물명)/i);
+    const roomNoH = findHeader(/(호실번호)/i);
+    const roomNameH = findHeader(/(강의실명|교육공간명)/i);
+
+    let roomItems: Array<{ building: string; room_no: string; room_name: string }> = [];
+    if (buildingH || roomNoH || roomNameH) {
+      const seen = new Set<string>();
+      for (const r of rows) {
+        const b = String((buildingH ? r[buildingH] : "") ?? "").trim();
+        const no = String((roomNoH ? r[roomNoH] : "") ?? "").trim();
+        const nm = String((roomNameH ? r[roomNameH] : "") ?? "").trim();
+        if (!b && !no && !nm) continue;
+        const key = `${b}||${no}||${nm}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        roomItems.push({ building: b, room_no: no, room_name: nm });
+      }
+      roomItems.sort((a, b) => (a.building || "").localeCompare(b.building || "", "ko") || (a.room_no || "").localeCompare(b.room_no || "", "ko"));
+    }
+
+    return NextResponse.json({
+      file: path.basename(filePath),
+      count: items.length,
+      columns: headers,
+      items,
+      rooms: { items: roomItems },
+    });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }

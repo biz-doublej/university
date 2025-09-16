@@ -8,6 +8,7 @@ type DatasetResp = {
   columns?: string[];
   items?: any[];
   error?: string;
+  rooms?: { items: Array<{ building: string; room_no: string; room_name: string }> };
 };
 
 export default function DatasetPage() {
@@ -53,19 +54,7 @@ export default function DatasetPage() {
   );
 
   const cols = data?.columns || [];
-  const labels: Record<string, string> = {
-    department: "학과",
-    course_code: "교과목 코드",
-    course_name: "교과목명",
-    grade: "학년",
-    section: "분반",
-    enrolled: "수강 인원",
-    limit: "제한 인원",
-    instructor: "담당교수",
-    building: "건물",
-    room: "강의실",
-    timeslot: "시간표",
-  };
+  const roomItems = data?.rooms?.items || [];
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -87,21 +76,18 @@ export default function DatasetPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-white/5">
             <tr>
-              {cols.map((c) => {
-                const label = labels[c] || c.replace(/_/g, " ");
-                return (
-                  <th key={c} className="text-left px-3 py-2 font-medium">
-                    {label}
-                  </th>
-                );
-              })}
+              {cols.map((c) => (
+                <th key={c} className="text-left px-3 py-2 font-medium whitespace-pre-wrap">
+                  {c}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {filtered.map((row, i) => (
               <tr key={i} className="odd:bg-white/0 even:bg-white/5">
                 {cols.map((c) => (
-                  <td key={c} className="px-3 py-2 whitespace-nowrap">
+                  <td key={c} className="px-3 py-2 whitespace-pre-wrap break-words">
                     {String(row[c] ?? "")}
                   </td>
                 ))}
@@ -110,6 +96,31 @@ export default function DatasetPage() {
           </tbody>
         </table>
       </div>
+      {roomItems.length > 0 && (
+        <div className="card">
+          <div className="font-medium mb-3">건물명별 강의실 목록</div>
+          <div className="overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-white/5">
+                <tr>
+                  <th className="text-left px-3 py-2">건물명</th>
+                  <th className="text-left px-3 py-2">호실번호</th>
+                  <th className="text-left px-3 py-2">강의실명(교육공간명)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roomItems.map((r, idx) => (
+                  <tr key={`${r.building}-${r.room_no}-${idx}`} className="odd:bg-white/0 even:bg-white/5">
+                    <td className="px-3 py-2 whitespace-pre-wrap break-words">{r.building}</td>
+                    <td className="px-3 py-2 whitespace-pre-wrap break-words">{r.room_no}</td>
+                    <td className="px-3 py-2 whitespace-pre-wrap break-words">{r.room_name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {filtered.length === 0 && (
         <div className="text-white/70">검색 결과가 없습니다.</div>
       )}

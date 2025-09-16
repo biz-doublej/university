@@ -199,6 +199,41 @@ exceptions:
 
 ---
 
+## Web Frontend (MVP)
+
+- Stack: Next.js 14 + TypeScript, Tailwind CSS
+- 위치: `web/`
+- API Base: 기본 `http://localhost:8000` (`NEXT_PUBLIC_API_BASE`로 재정의 가능)
+- 테넌트 헤더: 기본 `demo` (`NEXT_PUBLIC_TENANT_ID`로 재정의 가능)
+
+### 실행 방법
+
+1) 의존성 설치
+
+```
+cd web
+npm install
+```
+
+2) 개발 서버 실행
+
+```
+npm run dev
+```
+
+3) 접속: http://localhost:3000
+
+### 포함된 화면
+
+- Home: 백엔드 `/healthz` 연동 상태 표시, Import 링크
+- Import: `POST /v1/import/sections`에 CSV 업로드(필수 컬럼: `code,name,hours_per_week,expected_enrollment`)
+
+### 환경 변수
+
+- `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
+- `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
+
+
 ## 16) 출시 로드맵 (MVP→GA)
 
 * **M0–M1**: MVP(파일 업로드, 배정, 공실 히트맵, GCal 발행)

@@ -3,10 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0b1020;
-  --fg: #e9eef7;
-  --muted: #9aa4b2;
-  --primary: #4f46e5;
+  /* Brand tone: trust/future (blue/purple) with warm aura */
+  --bg: #0a0f1f;           /* deep navy */
+  --fg: #eaf1ff;          /* soft light */
+  --muted: #a3adbf;       /* cool gray */
+  --primary: #6366f1;     /* indigo 500 */
+  --accent: #7c3aed;      /* violet 600 */
+  --glow-blue: rgba(59, 130, 246, 0.15);   /* blue aura */
+  --glow-purple: rgba(139, 92, 246, 0.16); /* purple aura */
+  --glow-warm: rgba(255, 176, 109, 0.10);  /* warm light */
 }
 
 html, body {
@@ -14,7 +19,12 @@ html, body {
 }
 
 body {
-  background: var(--bg);
+  /* Layered background: base + radial auras (blue/purple) + warm light */
+  background:
+    radial-gradient(1200px 600px at -10% -10%, var(--glow-blue), transparent 55%),
+    radial-gradient(1000px 500px at 110% -20%, var(--glow-purple), transparent 60%),
+    radial-gradient(900px 420px at 50% 120%, var(--glow-warm), transparent 65%),
+    var(--bg);
   color: var(--fg);
 }
 
@@ -27,10 +37,21 @@ a {
 }
 
 .btn {
-  @apply inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60;
+  /* Gradient button matching blue→purple brand */
+  @apply inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-60;
+  background-image: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  transition: filter 0.15s ease;
 }
+.btn:hover { filter: brightness(1.05); }
 
 .input {
   @apply block w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500;
 }
 
+/* Brand title with subtle gradient text */
+.brand {
+  background: linear-gradient(90deg, #93c5fd 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

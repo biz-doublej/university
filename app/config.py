@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class Settings(BaseModel):
-    app_name: str = Field(default="CampusOps AI Backend")
+    app_name: str = Field(default="Timora AI")
     debug: bool = Field(default=False)
     database_url: str = Field(default=os.getenv("DATABASE_URL", "sqlite:///./dev.db"))
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])  # Configure in prod
@@ -17,4 +17,3 @@ class Settings(BaseModel):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

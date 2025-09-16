@@ -37,6 +37,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="Viewer")
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
     sso_subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class Room(Base):

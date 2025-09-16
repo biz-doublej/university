@@ -14,6 +14,9 @@ class ImportSectionsReport(BaseModel):
 class OptimizeRequest(BaseModel):
     policy_version: int
     week: str  # YYYY-WW
+    solver: str | None = Field(default="greedy", description="greedy | pulp | ortools")
+    slot_group: int | None = Field(default=1, description="Group N consecutive slots as one block")
+    forbid_checks: bool | None = Field(default=True, description="Enable forbidden-set filtering")
 
 
 class OptimizeStatus(BaseModel):
@@ -21,6 +24,7 @@ class OptimizeStatus(BaseModel):
     status: str
     score: Optional[float] = None
     explain: Optional[str] = None
+    solver: Optional[str] = None
 
 
 class AssignmentPatch(BaseModel):
@@ -31,6 +35,7 @@ class AssignmentPatch(BaseModel):
 
 class TimetableRoomItem(BaseModel):
     room_id: int
+    room_name: Optional[str] = None
     day: str
     start: str
     end: str
@@ -41,4 +46,3 @@ class VacancyHeatmapCell(BaseModel):
     day: str
     time: str
     vacancy_ratio: float
-

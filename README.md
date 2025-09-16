@@ -115,7 +115,7 @@ exceptions:
 ## 7) 핵심 API (요약)
 
 * `POST /v1/import/sections` CSV 업로드 → 검증 리포트
-* `POST /v1/optimize` {policy\_version, week} → job\_id
+* `POST /v1/optimize` {policy\_version, week, solver?, slot\_group?, forbid\_checks?} → job\_id
 * `GET /v1/optimize/{job_id}` → {status, score, explain}
 * `GET /v1/timetable/rooms?week=YYYY-WW`
 * `PATCH /v1/assignments/{id}` {room\_id,timeslot\_id,status}
@@ -228,6 +228,7 @@ npm run dev
 - Home: 백엔드 `/healthz` 연동 상태 표시, Import 링크
 - Import: `POST /v1/import/sections`에 CSV 업로드(필수 컬럼: `code,name,hours_per_week,expected_enrollment`)
 - Dataset: 레포 루트 `data/` 내 첫 번째 XLSX/CSV를 파싱하여 표로 표시
+- Scheduler: 데이터셋→DB Import, Solver 선택(greedy/PuLP/OR‑Tools 가용성 표시), 최적화 실행·결과 확인
 
 ### 환경 변수
 
@@ -239,6 +240,7 @@ npm run dev
 - 경로: 레포 루트의 `data/` 폴더 (예: `data/kbu.xlsx`)
 - 형식: `.xlsx`/`.xls`/`.csv` 중 하나. 여러 파일이 있을 경우 사전순 첫 파일을 사용.
 - 페이지: `http://localhost:3000/dataset`
+ - 스케줄러: `http://localhost:3000/scheduler`
 
 
 

@@ -4,3 +4,7 @@ pydantic==2.9.2
 SQLAlchemy==2.0.36
 python-multipart==0.0.9
 PyYAML==6.0.2
+openpyxl==3.1.5
+# Optional solver backends (install as needed)
+# ortools==9.10.4067
+# pulp==2.7.0

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "../../components/i18n";
 
 type CreateTenantResp = { id: number; name: string } | { detail?: string };
 type CreateProjectResp = { id: number; tenant_id: number; name: string } | { detail?: string };
@@ -9,6 +10,7 @@ type ListKeyItem = { id: number; name: string; key_prefix: string; active: boole
 
 export default function DevelopersPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  const { t, lang } = useI18n();
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState("Demo School");
   const [tenantId, setTenantId] = useState<number | null>(null);
@@ -92,13 +94,11 @@ export default function DevelopersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">개발자 센터 (Developer Center)</h1>
-      <div className="text-sm text-white/80">요금제 없이 API 키를 발급받아 백엔드 API를 호출할 수 있습니다.</div>
+      <h1 className="text-xl font-semibold">{t("developers.title")}</h1>
+      <div className="text-sm text-white/80">{t("developers.desc")}</div>
 
       {!authToken && (
-        <div className="card text-sm text-white/80">
-          프로젝트/키 관리는 로그인이 필요합니다. 상단 우측의 Login/Sign up 버튼을 사용하세요.
-        </div>
+        <div className="card text-sm text-white/80">{t("developers.loginPrompt")}</div>
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -111,45 +111,51 @@ export default function DevelopersPage() {
         </div> */}
 
         <div className="card space-y-3">
-          <div className="font-medium">2) 프로젝트 생성</div>
-          <input className="input" placeholder="프로젝트 이름" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-          <button className="btn w-fit" onClick={createProject} disabled={loading || !tenantId}>프로젝트 생성</button>
+          <div className="font-medium">2) {t("developers.createProject")}</div>
+          <input className="input" placeholder="Project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+          <button className="btn w-fit" onClick={createProject} disabled={loading || !tenantId}>{t("developers.createProject")}</button>
           {projectId && <div className="text-sm text-white/70">생성된 프로젝트 ID: {projectId}</div>}
         </div>
 
         <div className="card space-y-3 md:col-span-2">
-          <div className="font-medium">3) API 키 발급</div>
+          <div className="font-medium">3) {t("developers.issueKey")}</div>
           <div className="grid md:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="block text-xs mb-1">키 이름</label>
+              <label className="block text-xs mb-1">{t("developers.keyName")}</label>
               <input className="input" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
             </div>
             <div className="md:col-span-2">
-              <button className="btn" onClick={issueKey} disabled={loading || !projectId}>API 키 발급</button>
+              <button className="btn" onClick={issueKey} disabled={loading || !projectId}>{t("developers.issueKey")}</button>
             </div>
           </div>
           {apiKey && (
             <div className="text-sm">
-              <div className="text-white/80">발급된 키(한번만 표시):</div>
+              <div className="text-white/80">{lang === "ko" ? "발급된 키(한번만 표시):" : "Issued key (shown once):"}</div>
               <code className="block bg-white/10 p-2 rounded mt-1">{apiKey}</code>
-              <div className="text-white/60 mt-1">헤더에 <code>X-API-Key</code> 또는 <code>Authorization: Bearer &lt;키&gt;</code>로 사용하세요.</div>
+              <div className="text-white/60 mt-1">
+                {lang === "ko" ? (
+                  <>헤더에 <code>X-API-Key</code> 또는 <code>Authorization: Bearer &lt;키&gt;</code>로 사용하세요.</>
+                ) : (
+                  <>Use it as <code>X-API-Key</code> or <code>Authorization: Bearer &lt;token&gt;</code>.</>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         <div className="card space-y-3 md:col-span-2">
-          <div className="font-medium">발급된 키 목록</div>
-          <button className="btn w-fit" onClick={listKeys} disabled={!projectId}>새로고침</button>
+          <div className="font-medium">{t("developers.keys.name")}</div>
+          <button className="btn w-fit" onClick={listKeys} disabled={!projectId}>{t("developers.refresh")}</button>
           <div className="overflow-auto border border-white/10 rounded-lg">
             <table className="min-w-full text-sm">
               <thead className="bg-white/5">
                 <tr>
-                  <th className="text-left px-3 py-2">ID</th>
-                  <th className="text-left px-3 py-2">Name</th>
-                  <th className="text-left px-3 py-2">Prefix</th>
-                  <th className="text-left px-3 py-2">Active</th>
-                  <th className="text-left px-3 py-2">Created</th>
-                  <th className="text-left px-3 py-2">Last Used</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.id")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.name")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.prefix")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.active")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.created")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.lastUsed")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +164,7 @@ export default function DevelopersPage() {
                     <td className="px-3 py-2">{k.id}</td>
                     <td className="px-3 py-2">{k.name}</td>
                     <td className="px-3 py-2">{k.key_prefix}</td>
-                    <td className="px-3 py-2">{k.active ? "활성" : "비활성"}</td>
+                    <td className="px-3 py-2">{k.active ? (lang === "ko" ? "활성" : "Active") : (lang === "ko" ? "비활성" : "Inactive")}</td>
                     <td className="px-3 py-2">{k.created_at}</td>
                     <td className="px-3 py-2">{k.last_used_at || "-"}</td>
                   </tr>

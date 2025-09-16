@@ -227,11 +227,19 @@ npm run dev
 
 - Home: 백엔드 `/healthz` 연동 상태 표시, Import 링크
 - Import: `POST /v1/import/sections`에 CSV 업로드(필수 컬럼: `code,name,hours_per_week,expected_enrollment`)
+- Dataset: 레포 루트 `data/` 내 첫 번째 XLSX/CSV를 파싱하여 표로 표시
 
 ### 환경 변수
 
 - `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
 - `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
+
+### 데이터 파일 배치
+
+- 경로: 레포 루트의 `data/` 폴더 (예: `data/kbu.xlsx`)
+- 형식: `.xlsx`/`.xls`/`.csv` 중 하나. 여러 파일이 있을 경우 사전순 첫 파일을 사용.
+- 페이지: `http://localhost:3000/dataset`
+
 
 
 ## 16) 출시 로드맵 (MVP→GA)

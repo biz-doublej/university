@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="text-sm space-x-4">
               <a href="/" className="hover:underline">Home</a>
               <a href="/import" className="hover:underline">Import CSV</a>
+              <a href="/dataset" className="hover:underline">Dataset</a>
             </nav>
           </div>
         </header>
@@ -24,4 +25,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

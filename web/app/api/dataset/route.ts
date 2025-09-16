@@ -4,8 +4,8 @@ import fs from "node:fs";
 export const runtime = "nodejs";
 
 function findDataFile(preferred?: string): string | null {
-  // repo root is two levels up from this file (web/app/api/...)
-  const root = path.resolve(process.cwd(), "../..");
+  // repo root is one level up from `web/`
+  const root = path.resolve(process.cwd(), "..");
   const dataDir = path.join(root, "data");
   if (!fs.existsSync(dataDir)) return null;
 
@@ -89,19 +89,51 @@ function takeColumns(row: any) {
   };
 }
 
+function parseCSV(text: string): any[] {
+  const lines = text.split(/\r?\n/);
+  const rows: string[][] = [];
+  for (const line of lines) {
+    if (!line) continue;
+    const cols: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        cols.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    cols.push(cur);
+    // skip empty rows
+    if (cols.every((c) => c.trim() === "")) continue;
+    rows.push(cols);
+  }
+  if (rows.length === 0) return [];
+  const header = rows[0];
+  const out: any[] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const obj: any = {};
+    const row = rows[r];
+    for (let c = 0; c < header.length; c++) {
+      obj[header[c]] = row[c] ?? "";
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
 export async function GET(request: Request) {
   try {
-    // Lazy-load to avoid build-time resolution errors if not installed yet
-    let XLSX: any;
-    try {
-      const mod: any = await import("xlsx");
-      XLSX = mod?.default || mod;
-    } catch (e) {
-      return NextResponse.json(
-        { error: "Missing dependency 'xlsx'. Run: cd web && npm install" },
-        { status: 500 }
-      );
-    }
     const { searchParams } = new URL(request.url);
     const preferred = searchParams.get("file") || process.env.DATA_XLSX || undefined;
     const filePath = findDataFile(preferred);
@@ -118,11 +150,19 @@ export async function GET(request: Request) {
     let rows: any[] = [];
     if (ext === ".csv") {
       const csv = fs.readFileSync(filePath, "utf8");
-      const wb = XLSX.read(csv, { type: "string" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });
-      rows = raw as any[];
+      rows = parseCSV(csv);
     } else {
+      // Lazy-load only when needed for Excel
+      let XLSX: any;
+      try {
+        const mod: any = await import(/* webpackIgnore: true */ "xlsx");
+        XLSX = mod?.default || mod;
+      } catch (e) {
+        return NextResponse.json(
+          { error: "Missing dependency 'xlsx'. Run: cd web && npm install" },
+          { status: 500 }
+        );
+      }
       const wb = XLSX.readFile(filePath);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });

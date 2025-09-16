@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import base64
+import json
 import hmac
 import os
 import secrets
 import hashlib
+import time
 from datetime import datetime
 from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from ..models import ApiKey, Tenant, Project
+from ..models import ApiKey, Tenant, Project, User
 
 
 PEPPER = os.getenv("API_KEY_PEPPER", "")
+AUTH_SECRET = os.getenv("AUTH_SECRET", "")
 
 
 def _sha256_hex(data: str) -> str:
@@ -105,3 +109,66 @@ def resolve_tenant_from_headers(db: Session, *, api_key: Optional[str], tenant_k
     return db.query(Tenant).filter(Tenant.enabled == True).first()  # noqa: E712
 
 
+# Password hashing (PBKDF2-HMAC-SHA256)
+def hash_password(password: str, *, iterations: int = 120_000) -> str:
+    salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2${iterations}${base64.urlsafe_b64encode(salt).decode()}${base64.urlsafe_b64encode(dk).decode()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, iter_str, salt_b64, hash_b64 = stored.split("$")
+        if algo != "pbkdf2":
+            return False
+        iterations = int(iter_str)
+        salt = base64.urlsafe_b64decode(salt_b64.encode())
+        expected = base64.urlsafe_b64decode(hash_b64.encode())
+        calc = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+        return hmac.compare_digest(expected, calc)
+    except Exception:
+        return False
+
+
+# Session token (HMAC-SHA256, not JWT)
+def _b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+def _b64u_json(obj: dict) -> str:
+    return _b64u(json.dumps(obj, separators=(",", ":")).encode())
+
+
+def create_session_token(user: User, *, ttl_seconds: int = 7 * 24 * 3600) -> str:
+    payload = {"uid": user.id, "tid": user.tenant_id, "exp": int(time.time()) + ttl_seconds}
+    p = _b64u_json(payload)
+    sig = _b64u(hmac.new(AUTH_SECRET.encode("utf-8"), p.encode(), hashlib.sha256).digest())
+    return f"tma.{p}.{sig}"
+
+
+def verify_session_token(token: str) -> Optional[dict]:
+    try:
+        if token.startswith("Bearer "):
+            token = token[len("Bearer "):].strip()
+        if not token.startswith("tma."):
+            return None
+        _, p, sig = token.split(".", 2)
+        expected = _b64u(hmac.new(AUTH_SECRET.encode("utf-8"), p.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(expected, sig):
+            return None
+        # Pad base64
+        pad = "=" * (-len(p) % 4)
+        payload = json.loads(base64.urlsafe_b64decode((p + pad).encode()))
+        if int(payload.get("exp", 0)) < int(time.time()):
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+def get_user_from_token(db: Session, token: str) -> Optional[User]:
+    payload = verify_session_token(token)
+    if not payload:
+        return None
+    uid = int(payload.get("uid"))
+    return db.get(User, uid)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type CreateTenantResp = { id: number; name: string } | { detail?: string };
 type CreateProjectResp = { id: number; tenant_id: number; name: string } | { detail?: string };
@@ -8,6 +8,11 @@ type IssueKeyResp = { api_key: string; key_prefix: string; project_id: number } 
 type ListKeyItem = { id: number; name: string; key_prefix: string; active: boolean; created_at: string; last_used_at?: string };
 
 export default function DevelopersPage() {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [tenantNameSignup, setTenantNameSignup] = useState("");
   const [tenantName, setTenantName] = useState("Demo School");
   const [tenantId, setTenantId] = useState<number | null>(null);
 
@@ -20,6 +25,59 @@ export default function DevelopersPage() {
 
   const [msg, setMsg] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const t = localStorage.getItem("tma_token");
+    if (t) setAuthToken(t);
+  }, []);
+
+  const signup = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const r = await fetch(`${API_BASE}/v1/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, tenant_name: tenantNameSignup || "My School" }),
+      });
+      const j: any = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      localStorage.setItem("tma_token", j.token);
+      setAuthToken(j.token);
+      setMsg("회원가입 및 로그인 완료");
+    } catch (e: any) {
+      setMsg(`Signup error: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const r = await fetch(`${API_BASE}/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const j: any = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      localStorage.setItem("tma_token", j.token);
+      setAuthToken(j.token);
+      setMsg("로그인 완료");
+    } catch (e: any) {
+      setMsg(`Login error: ${e.message || e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem("tma_token");
+    setAuthToken(null);
+    setMsg("로그아웃되었습니다.");
+  };
 
   const createTenant = async () => {
     setLoading(true);
@@ -38,11 +96,11 @@ export default function DevelopersPage() {
   };
 
   const createProject = async () => {
-    if (!tenantId) { setMsg("먼저 테넌트를 생성하세요."); return; }
+    if (!authToken) { setMsg("먼저 로그인하세요."); return; }
     setLoading(true);
     setMsg("");
     try {
-      const r = await fetch("/api/admin/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenant_id: tenantId, name: projectName }) });
+      const r = await fetch(`${API_BASE}/v1/dev/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: projectName }) });
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setProjectId(j.id);
@@ -56,11 +114,12 @@ export default function DevelopersPage() {
 
   const issueKey = async () => {
     if (!projectId) { setMsg("먼저 프로젝트를 생성하세요."); return; }
+    if (!authToken) { setMsg("먼저 로그인하세요."); return; }
     setLoading(true);
     setMsg("");
     setApiKey(null);
     try {
-      const r = await fetch(`/api/admin/projects/${projectId}/keys`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: keyName }) });
+      const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: keyName }) });
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setApiKey(j.api_key);
@@ -74,8 +133,8 @@ export default function DevelopersPage() {
   };
 
   const listKeys = async () => {
-    if (!projectId) return;
-    const r = await fetch(`/api/admin/projects/${projectId}/keys`);
+    if (!projectId || !authToken) return;
+    const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, { headers: { Authorization: `Bearer ${authToken}` } });
     const j: any = await r.json();
     if (r.ok && Array.isArray(j)) setKeys(j);
   };
@@ -87,11 +146,26 @@ export default function DevelopersPage() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="card space-y-3">
-          <div className="font-medium">1) 테넌트(학교) 생성</div>
+          <div className="font-medium">0) 회원가입 / 로그인</div>
+          <input className="input" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="input" type="password" placeholder="비밀번호(8자 이상)" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <input className="input" placeholder="테넌트 이름(회원가입 시)" value={tenantNameSignup} onChange={(e) => setTenantNameSignup(e.target.value)} />
+            <div className="flex gap-2">
+              <button className="btn" onClick={signup} disabled={loading}>회원가입</button>
+              <button className="btn" onClick={login} disabled={loading}>로그인</button>
+              {authToken && <button className="btn" onClick={logout}>로그아웃</button>}
+            </div>
+          </div>
+          {authToken && <div className="text-sm text-white/70">로그인됨</div>}
+        </div>
+        {/* 기존 Admin 경로(선택 사용): 필요 시 사용 */}
+        {/* <div className="card space-y-3">
+          <div className="font-medium">(관리자) 테넌트 생성</div>
           <input className="input" placeholder="테넌트 이름" value={tenantName} onChange={(e) => setTenantName(e.target.value)} />
           <button className="btn w-fit" onClick={createTenant} disabled={loading}>테넌트 생성</button>
           {tenantId && <div className="text-sm text-white/70">생성된 테넌트 ID: {tenantId}</div>}
-        </div>
+        </div> */}
 
         <div className="card space-y-3">
           <div className="font-medium">2) 프로젝트 생성</div>
@@ -156,4 +230,3 @@ export default function DevelopersPage() {
     </div>
   );
 }
-

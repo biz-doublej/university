@@ -263,6 +263,20 @@ npm run dev
   - `Authorization: Bearer timora_<prefix>.<secret>`
 - 키에 연결된 테넌트가 자동으로 선택됩니다. `X-Tenant-ID`는 옵션(오버라이드 목적)입니다.
 
+### 사용자 가입/로그인 기반 발급 (요금제 없음)
+
+- 회원가입: `POST /v1/auth/signup` { email, password, tenant_name }
+  - 신규 테넌트 생성 + 사용자(Admin) 생성 + 세션 토큰 반환
+- 로그인: `POST /v1/auth/login` { email, password } → 세션 토큰 반환
+- 내 정보: `GET /v1/auth/me` Authorization: Bearer tma.<payload>.<sig>
+- 개발자 엔드포인트(사용자 테넌트 한정):
+  - `POST /v1/dev/projects` { name } → 프로젝트 생성
+  - `GET /v1/dev/projects` → 내 테넌트 프로젝트 목록
+  - `POST /v1/dev/projects/{id}/keys` { name? } → API 키 발급(1회 노출)
+  - `GET /v1/dev/projects/{id}/keys` → 키 목록
+- 토큰 형식: 세션 토큰은 HMAC 서명된 tma.<payload>.<sig> (JWT 아님)
+- 환경변수: `AUTH_SECRET`(세션 토큰 서명), `API_KEY_PEPPER`(API 키 해시)
+
 ### 데이터 파일 배치
 
 - 경로: 레포 루트의 `data/` 폴더 (예: `data/kbu.xlsx`)

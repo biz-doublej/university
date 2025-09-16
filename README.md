@@ -248,6 +248,21 @@ npm run dev
 - `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
 - `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
 
+### API Key 발급/사용 (Timora AI)
+
+- Admin 토큰 설정: 서버 환경변수 `ADMIN_TOKEN="<임의의 강한 토큰>"`
+- 테넌트 생성:
+  - `POST /v1/admin/tenants` (헤더 `X-Admin-Token`) → `{ id, name }`
+- 프로젝트 생성:
+  - `POST /v1/admin/projects` (헤더 `X-Admin-Token`) → `{ id, tenant_id }`
+- API 키 발급:
+  - `POST /v1/admin/projects/{project_id}/keys` (헤더 `X-Admin-Token`) → `{ api_key: "timora_<prefix>.<secret>" }`
+  - 키는 발급 시 1회만 평문 노출됩니다. 서버에는 해시로 저장됩니다.
+- API 호출 시 인증 헤더(둘 중 하나):
+  - `X-API-Key: timora_<prefix>.<secret>`
+  - `Authorization: Bearer timora_<prefix>.<secret>`
+- 키에 연결된 테넌트가 자동으로 선택됩니다. `X-Tenant-ID`는 옵션(오버라이드 목적)입니다.
+
 ### 데이터 파일 배치
 
 - 경로: 레포 루트의 `data/` 폴더 (예: `data/kbu.xlsx`)

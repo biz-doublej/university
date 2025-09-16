@@ -1,4 +1,18 @@
-from .core import Tenant, User, Room, Course, Timeslot, Assignment, Policy, Calendar, Blackout, AuditLog
+from .core import (
+    Tenant,
+    User,
+    Room,
+    Course,
+    Timeslot,
+    Assignment,
+    Policy,
+    Calendar,
+    Blackout,
+    AuditLog,
+    Project,
+    ApiKey,
+    ApiLog,
+)
 
 __all__ = [
     "Tenant",
@@ -11,5 +25,7 @@ __all__ = [
     "Calendar",
     "Blackout",
     "AuditLog",
+    "Project",
+    "ApiKey",
+    "ApiLog",
 ]
-

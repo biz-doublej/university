@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from ..db import get_db
 from ..models import Tenant, Room, Course, Timeslot
+from ..services.auth import resolve_tenant_from_headers
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -134,12 +135,14 @@ def _get_or_create_tenant(db, tenant_header: Optional[str]) -> Tenant:
 def import_dataset(
     file: Optional[str] = Query(default=None, description="Specific file name in data/ to import"),
     tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     db=Depends(get_db),
 ):
     path = _find_data_file(file)
     if not path:
         return {"imported": False, "reason": "no data file"}
-    tenant = _get_or_create_tenant(db, tenant_key)
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
     if tenant is None:
         return {"imported": False, "reason": "no tenant"}
 

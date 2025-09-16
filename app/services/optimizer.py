@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Literal
+from typing import Literal, Optional
 
 from sqlalchemy import select
 
@@ -20,13 +20,17 @@ def submit_optimize_job(
     solver: Literal["greedy", "pulp", "ortools"] = "greedy",
     slot_group: int = 1,
     forbid_checks: bool = True,
+    tenant_id: Optional[int] = None,
 ) -> str:
     def _worker(job_id: str) -> None:
         queue.update(job_id, status="running")
         started = time.time()
         # Use default tenant (first enabled) for MVP
         with SessionLocal() as db:
-            tenant = db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
+            if tenant_id is not None:
+                tenant = db.get(Tenant, tenant_id)
+            else:
+                tenant = db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
             if tenant is None:
                 queue.update(job_id, status="failed", explain="No tenant found")
                 return

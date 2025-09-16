@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import import_sections, import_dataset, optimize, timetable, assignments, vacancy, calendar, dev, scheduler_status
+from . import import_sections, import_dataset, optimize, timetable, assignments, vacancy, calendar, dev, scheduler_status, admin
 
 
 def get_v1_router() -> APIRouter:
@@ -14,4 +14,5 @@ def get_v1_router() -> APIRouter:
     router.include_router(calendar.router)
     router.include_router(dev.router)
     router.include_router(scheduler_status.router)
+    router.include_router(admin.router)
     return router

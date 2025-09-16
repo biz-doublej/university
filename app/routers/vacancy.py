@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..schemas import VacancyHeatmapCell
 from ..db import get_db
 from ..models import Tenant, Room, Timeslot, Assignment
+from ..services.auth import resolve_tenant_from_headers
 
 router = APIRouter(prefix="/vacancy", tags=["vacancy"])
 
@@ -32,9 +33,11 @@ def vacancy_heatmap(
     week: str = Query(..., description="YYYY-WW (미사용 placeholder)"),
     building: str | None = Query(default=None),
     tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),
 ) -> list[VacancyHeatmapCell]:
-    tenant = _resolve_tenant(db, tenant_key)
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
     if tenant is None:
         return []
 
@@ -88,12 +91,14 @@ def available_rooms(
     end: str = Query(..., description="종료 HH:MM"),
     building: str | None = Query(default=None),
     tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),
 ):
     """주어진 구간에 비어있는 강의실 목록을 반환합니다.
     외부 대여 연동(가용 조회)의 기본 API로 사용 가능합니다.
     """
-    tenant = _resolve_tenant(db, tenant_key)
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
     if tenant is None:
         return {"items": []}
 

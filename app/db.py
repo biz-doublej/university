@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import create_engine
@@ -24,11 +23,10 @@ def init_db() -> None:
     Base.metadata.create_all(bind=_engine)
 
 
-@contextmanager
 def get_db() -> Generator[Session, None, None]:
+    """FastAPI dependency that yields a SQLAlchemy Session."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-

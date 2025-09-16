@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/import" className="hover:underline">Import CSV</a>
               <a href="/scheduler" className="hover:underline">Scheduler</a>
               <a href="/dataset" className="hover:underline">Dataset</a>
+              <a href="/developers" className="hover:underline">Developers</a>
             </nav>
           </div>
         </header>

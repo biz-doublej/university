@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useI18n } from "../../components/i18n";
 
 export default function ImportPage() {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -31,7 +33,7 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">과목 섹션 CSV 업로드</h1>
+      <h1 className="text-xl font-semibold">{t("importPage.title")}</h1>
       <div className="card space-y-3">
         <form onSubmit={onSubmit} className="space-y-3">
           <input
@@ -41,20 +43,19 @@ export default function ImportPage() {
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           <button className="btn" disabled={!file || loading}>
-            {loading ? "업로드 중…" : "업로드"}
+            {loading ? t("importPage.uploading") : t("importPage.upload")}
           </button>
         </form>
-        <p className="text-sm text-white/70">필수 컬럼: code, name, hours_per_week, expected_enrollment</p>
+        <p className="text-sm text-white/70">{t("importPage.requiredCols")}</p>
       </div>
 
-      {error && <div className="card text-red-300">에러: {error}</div>}
+      {error && <div className="card text-red-300">{t("importPage.error")}: {error}</div>}
       {result && (
         <div className="card">
-          <div className="font-medium mb-2">검증 결과</div>
+          <div className="font-medium mb-2">{t("importPage.result")}</div>
           <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre>
         </div>
       )}
     </div>
   );
-}
-
+};

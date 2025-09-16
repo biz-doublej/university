@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "../../components/i18n";
 
 type DatasetResp = {
   file?: string;
@@ -12,6 +13,7 @@ type DatasetResp = {
 };
 
 export default function DatasetPage() {
+  const { t } = useI18n();
   const [data, setData] = useState<DatasetResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,14 +44,11 @@ export default function DatasetPage() {
     );
   }, [data, q]);
 
-  if (loading) return <div>로딩 중…</div>;
+  if (loading) return <div>{t("dataset.loading")}</div>;
   if (error) return (
     <div className="space-y-3">
-      <div className="card text-red-300">에러: {error}</div>
-      <div className="card text-sm text-white/80">
-        데이터 파일이 필요합니다. 레포 루트의 `data/` 폴더에 XLSX/CSV 파일을 넣어주세요.
-        <br />예: `data/kbu.xlsx`
-      </div>
+      <div className="card text-red-300">{t("dataset.error")}: {error}</div>
+      <div className="card text-sm text-white/80">{t("dataset.needFile1")}<br />{t("dataset.needFile2")}</div>
     </div>
   );
 
@@ -59,14 +58,14 @@ export default function DatasetPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">경복대학교 데이터셋 (미가공)</h1>
+          <h1 className="text-xl font-semibold">{t("dataset.title")}</h1>
           {data?.file && (
-            <p className="text-sm text-white/60 mt-1">원본 파일: {data.file} · 행수: {data.count}</p>
+            <p className="text-sm text-white/60 mt-1">{t("dataset.originalFile")}: {data.file} · {t("dataset.rows")}: {data.count}</p>
           )}
         </div>
         <input
           className="input max-w-xs"
-          placeholder="검색(학과/코드/교과목명/교수)…"
+          placeholder={t("dataset.searchPlaceholder")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -98,14 +97,14 @@ export default function DatasetPage() {
       </div>
       {roomItems.length > 0 && (
         <div className="card">
-          <div className="font-medium mb-3">건물명별 강의실 목록</div>
+          <div className="font-medium mb-3">{t("dataset.roomList")}</div>
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-white/5">
                 <tr>
-                  <th className="text-left px-3 py-2">건물명</th>
-                  <th className="text-left px-3 py-2">호실번호</th>
-                  <th className="text-left px-3 py-2">강의실명(교육공간명)</th>
+                  <th className="text-left px-3 py-2">{t("dataset.building")}</th>
+                  <th className="text-left px-3 py-2">{t("dataset.roomNo")}</th>
+                  <th className="text-left px-3 py-2">{t("dataset.roomName")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -122,7 +121,7 @@ export default function DatasetPage() {
         </div>
       )}
       {filtered.length === 0 && (
-        <div className="text-white/70">검색 결과가 없습니다.</div>
+        <div className="text-white/70">{t("dataset.noResults")}</div>
       )}
     </div>
   );

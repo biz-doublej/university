@@ -136,11 +136,11 @@ const DICT: Record<Lang, Dict> = {
       status: "상태",
     },
     nav: {
-      home: "Home",
-      import: "Import CSV",
-      scheduler: "Scheduler",
-      dataset: "Dataset",
-      developers: "Developers",
+      home: "홈",
+      import: "CSV 가져오기",
+      scheduler: "스케줄러",
+      dataset: "데이터셋",
+      developers: "개발자 센터",
     },
     auth: {
       login: "로그인",

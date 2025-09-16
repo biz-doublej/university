@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useI18n } from "../../components/i18n";
 
 type SolverStatus = { greedy: boolean; pulp: boolean; ortools: boolean };
 type OptimizeResp = { job_id: string; status: string; solver?: string };
 type OptimizeStatus = { job_id: string; status: string; score?: number; explain?: string };
 
 export default function SchedulerPage() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<SolverStatus>({ greedy: true, pulp: false, ortools: false });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string>("");
@@ -81,12 +83,12 @@ export default function SchedulerPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">스케줄러</h1>
+      <h1 className="text-xl font-semibold">{t("scheduler.title")}</h1>
       <div className="card space-y-3">
-        <div className="text-sm text-white/80">데이터셋을 DB로 가져오고, 금지조합/워밍업/슬롯그룹 기반으로 최적화를 실행합니다.</div>
+        <div className="text-sm text-white/80">{t("scheduler.desc")}</div>
         <div className="flex gap-2 flex-wrap">
-          <button className="btn" onClick={runImport} disabled={loading}>데이터셋 Import</button>
-          <button className="btn" onClick={seedTimeslots}>기본 Timeslot 시드</button>
+          <button className="btn" onClick={runImport} disabled={loading}>{t("scheduler.importBtn")}</button>
+          <button className="btn" onClick={seedTimeslots}>{t("scheduler.seedBtn")}</button>
         </div>
         {!!msg && <div className="text-white/70">{msg}</div>}
       </div>
@@ -94,19 +96,19 @@ export default function SchedulerPage() {
       <div className="card space-y-3">
         <div className="grid md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-xs mb-1">주차/주 식별(예: 2025-09)</label>
+            <label className="block text-xs mb-1">{t("scheduler.weekLabel")}</label>
             <input className="input" value={week} onChange={(e) => setWeek(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs mb-1">Solver</label>
+            <label className="block text-xs mb-1">{t("scheduler.solver")}</label>
             <select className="input" value={solver} onChange={(e) => setSolver(e.target.value)}>
-              <option value="greedy">greedy (내장)</option>
-              <option value="pulp" disabled={!status.pulp}>PuLP {status.pulp ? "(사용 가능)" : "(미설치)"}</option>
-              <option value="ortools" disabled={!status.ortools}>OR-Tools CP-SAT {status.ortools ? "(사용 가능)" : "(미설치)"}</option>
+              <option value="greedy">{t("scheduler.greedy")}</option>
+              <option value="pulp" disabled={!status.pulp}>{t("scheduler.pulp")} {status.pulp ? t("scheduler.available") : t("scheduler.unavailable")}</option>
+              <option value="ortools" disabled={!status.ortools}>{t("scheduler.ortools")} {status.ortools ? t("scheduler.available") : t("scheduler.unavailable")}</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs mb-1">Slot Group</label>
+            <label className="block text-xs mb-1">{t("scheduler.slotGroup")}</label>
             <select className="input" value={String(slotGroup)} onChange={(e) => setSlotGroup(parseInt(e.target.value))}>
               <option value="1">1</option>
               <option value="2">2</option>
@@ -114,20 +116,20 @@ export default function SchedulerPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs mb-1">Forbidden Set 필터</label>
+            <label className="block text-xs mb-1">{t("scheduler.forbidLabel")}</label>
             <div>
               <input id="forbid" type="checkbox" checked={forbid} onChange={(e) => setForbid(e.target.checked)} />
-              <label htmlFor="forbid" className="ml-2 text-sm">활성화</label>
+              <label htmlFor="forbid" className="ml-2 text-sm">{t("scheduler.forbidOn")}</label>
             </div>
           </div>
         </div>
         <div>
-          <button className="btn" onClick={runOptimize} disabled={loading}>최적화 실행</button>
+          <button className="btn" onClick={runOptimize} disabled={loading}>{t("scheduler.runOptimize")}</button>
         </div>
         {job && (
           <div className="text-sm">
-            상태: <span className="text-white/90">{job.status}</span>{" "}
-            {job.score != null && <>· 점수: {job.score}</>}{" "}
+            {t("scheduler.status")}: <span className="text-white/90">{job.status}</span>{" "}
+            {job.score != null && <>· {t("scheduler.score")}: {job.score}</>}{" "}
             {job.explain && <div className="mt-1 text-white/70">{job.explain}</div>}
           </div>
         )}
@@ -135,16 +137,16 @@ export default function SchedulerPage() {
 
       {assignments.length > 0 && (
         <div className="card">
-          <div className="font-medium mb-3">배정 결과</div>
+          <div className="font-medium mb-3">{t("scheduler.resultTitle")}</div>
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-white/5">
                 <tr>
-                  <th className="text-left px-3 py-2">요일</th>
-                  <th className="text-left px-3 py-2">시작</th>
-                  <th className="text-left px-3 py-2">종료</th>
-                  <th className="text-left px-3 py-2">과목코드</th>
-                  <th className="text-left px-3 py-2">강의실</th>
+                  <th className="text-left px-3 py-2">{t("scheduler.thead.day")}</th>
+                  <th className="text-left px-3 py-2">{t("scheduler.thead.start")}</th>
+                  <th className="text-left px-3 py-2">{t("scheduler.thead.end")}</th>
+                  <th className="text-left px-3 py-2">{t("scheduler.thead.course")}</th>
+                  <th className="text-left px-3 py-2">{t("scheduler.thead.room")}</th>
                 </tr>
               </thead>
               <tbody>

@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { Health } from "../components/health";
 import { useI18n } from "../components/i18n";

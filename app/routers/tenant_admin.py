@@ -9,8 +9,7 @@ from sqlalchemy import select
 from ..db import get_db
 from ..models import Course, CourseReview, Enrollment, Student, User, Tenant
 from ..schemas import AdminDataUpload
-from ..services.auth import get_user_from_token
-from ..services.auth import generate_api_key
+from ..services.auth import get_user_from_token, generate_api_key
 from pydantic import BaseModel, Field
 
 

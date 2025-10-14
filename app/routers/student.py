@@ -59,7 +59,7 @@ def get_profile(
         year=student.year,
         email=student.email,
         university=user.university_name,
-        metadata=student.metadata,
+        metadata=student.profile,
     )
 
 

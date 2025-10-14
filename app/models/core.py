@@ -179,7 +179,7 @@ class Student(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     major: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    profile: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

@@ -106,12 +106,21 @@ export default function SignupPage() {
         <div className="space-y-1">
           <label className="block text-sm text-white/80">{t("signup.university")}</label>
           {hasCatalog ? (
-            <select className="input" value={university} onChange={(e) => setUniversity(e.target.value)}>
-              <option value="">{loadingCatalog ? t("signup.loadingCatalog") : t("signup.selectUniversity")}</option>
-              {catalog.map((item) => (
-                <option key={item.university} value={item.university}>{item.university}</option>
-              ))}
-            </select>
+            <>
+              <input
+                className="input"
+                list="signup-university-list"
+                value={university}
+                onChange={(e) => setUniversity(e.target.value)}
+                placeholder={loadingCatalog ? t("signup.loadingCatalog") : t("signup.selectUniversity")}
+                autoComplete="off"
+              />
+              <datalist id="signup-university-list">
+                {catalog.map((item) => (
+                  <option key={item.university} value={item.university} />
+                ))}
+              </datalist>
+            </>
           ) : (
             <input className="input" value={university} onChange={(e) => setUniversity(e.target.value)} placeholder={t("signup.university")} />
           )}
@@ -120,12 +129,22 @@ export default function SignupPage() {
           <div className="space-y-1">
             <label className="block text-sm text-white/80">{t("signup.department")}</label>
             {hasCatalog ? (
-              <select className="input" value={department} onChange={(e) => setDepartment(e.target.value)} disabled={!university}>
-                <option value="">{university ? t("signup.selectDepartment") : t("signup.selectUniversity")}</option>
-                {departments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
+              <>
+                <input
+                  className="input"
+                  list="signup-department-list"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  placeholder={university ? t("signup.selectDepartment") : t("signup.selectUniversity")}
+                  disabled={!university}
+                  autoComplete="off"
+                />
+                <datalist id="signup-department-list">
+                  {departments.map((dept) => (
+                    <option key={dept} value={dept} />
+                  ))}
+                </datalist>
+              </>
             ) : (
               <input className="input" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder={t("signup.department")} />
             )}

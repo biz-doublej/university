@@ -5,6 +5,7 @@ SQLAlchemy==2.0.36
 python-multipart==0.0.9
 PyYAML==6.0.2
 openpyxl==3.1.5
+pymysql==1.1.1  # MySQL driver (required for Cloud SQL)
 # Optional solver backends (install as needed)
 # ortools==9.10.4067
 # pulp==2.7.0

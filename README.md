@@ -247,6 +247,7 @@ npm run dev
 
 - `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
 - `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
+- 클라우드 배포 준비 체크리스트: `docs/gcp-prep.md`
 
 ### API Key 발급/사용 (Timora AI)
 

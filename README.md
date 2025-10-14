@@ -250,6 +250,7 @@ npm run dev
 
 ### API Key 발급/사용 (Timora AI)
 
+- 웹 포털: `http://localhost:3000/developers` (로그인 → 프로젝트 선택/생성 → API 키 발급)
 - Admin 토큰 설정: 서버 환경변수 `ADMIN_TOKEN="<임의의 강한 토큰>"`
 - 테넌트 생성:
   - `POST /v1/admin/tenants` (헤더 `X-Admin-Token`) → `{ id, name }`
@@ -276,6 +277,28 @@ npm run dev
   - `GET /v1/dev/projects/{id}/keys` → 키 목록
 - 토큰 형식: 세션 토큰은 HMAC 서명된 tma.<payload>.<sig> (JWT 아님)
 - 환경변수: `AUTH_SECRET`(세션 토큰 서명), `API_KEY_PEPPER`(API 키 해시)
+
+### 역할 기반 캠퍼스 API (학생/교원/대학 관리자)
+
+- 학생 포털 API (`/v1/student/*`)
+  - `GET /v1/student/profile` → 학생 메타데이터 조회
+  - `GET /v1/student/recommendations` → 전공/후기 기반 강의 추천 (AI 스코어)
+  - `GET /v1/student/enrollments`, `POST /v1/student/enrollments` → 수강신청/대기 상태 기록
+  - `POST /v1/student/reviews` → 강의 후기 입력 (추천 AI 학습 데이터)
+- 교원 포털 API (`/v1/faculty/*`)
+  - `GET /v1/faculty/courses` → 담당 강의 요약(평점, 수강 인원)
+  - `GET /v1/faculty/courses/{id}/reviews` → 최신 학생 후기 열람
+  - `POST /v1/faculty/courses/{id}/reviews/ack` → 강의 운영 메모/응답 기록
+- 대학 관리자 API (`/v1/tenant-admin/*`)
+  - `GET /v1/tenant-admin/summary` → 테넌트별 데이터 현황
+  - `POST /v1/tenant-admin/ingest` → 강의/학생/수강/후기 데이터를 JSON 업로드
+
+### 웹 포털 구획 (동일 도메인 내 분리 진입)
+
+- `web/app/student` — 학생 전용 추천·수강신청 대시보드 (로그인 필요)
+- `web/app/faculty` — 교수 전용 강의 품질/후기 모니터링
+- `web/app/tenant-admin` — 대학 관리자 데이터 업로드 & 현황 파악
+- ※ 네비게이션에는 노출하지 않고, 직접 URL 진입 또는 추후 SSO 연동으로 이동 계획
 
 ### 데이터 파일 배치
 

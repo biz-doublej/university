@@ -12,6 +12,9 @@ from .core import (
     Project,
     ApiKey,
     ApiLog,
+    Student,
+    Enrollment,
+    CourseReview,
 )
 
 __all__ = [
@@ -28,4 +31,7 @@ __all__ = [
     "Project",
     "ApiKey",
     "ApiLog",
+    "Student",
+    "Enrollment",
+    "CourseReview",
 ]

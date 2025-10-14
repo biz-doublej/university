@@ -60,6 +60,10 @@ const DICT: Record<Lang, Dict> = {
       issueKey: "Issue API Key",
       keyName: "Key name",
       refresh: "Refresh",
+      sessionExpired: "Session expired. Please log in again.",
+      projectSelect: "Select project",
+      projectSelectPlaceholder: "Choose a project",
+      noProjects: "No project found. Create one to issue keys.",
       keys: {
         id: "ID",
         name: "Name",
@@ -171,6 +175,10 @@ const DICT: Record<Lang, Dict> = {
       issueKey: "API 키 발급",
       keyName: "키 이름",
       refresh: "새로고침",
+      sessionExpired: "세션이 만료되었습니다. 다시 로그인해주세요.",
+      projectSelect: "프로젝트 선택",
+      projectSelectPlaceholder: "프로젝트를 선택하세요",
+      noProjects: "아직 프로젝트가 없습니다. 먼저 프로젝트를 생성하세요.",
       keys: {
         id: "ID",
         name: "Name",

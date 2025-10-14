@@ -3,16 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
+from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db import Base
@@ -170,4 +161,49 @@ class ApiLog(Base):
     path: Mapped[str] = mapped_column(String(255))
     method: Mapped[str] = mapped_column(String(16))
     status: Mapped[int] = mapped_column(Integer, default=200)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Student(Base):
+    __tablename__ = "students"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    major: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Enrollment(Base):
+    __tablename__ = "enrollments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="enrolled")  # enrolled|waitlisted|completed|dropped
+    term: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    preference_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CourseReview(Base):
+    __tablename__ = "course_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    student_id: Mapped[Optional[int]] = mapped_column(ForeignKey("students.id"), nullable=True, index=True)
+    rating_overall: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1-5
+    rating_difficulty: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_instructor: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    semester: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

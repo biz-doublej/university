@@ -3,20 +3,17 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../components/i18n";
 
-type CreateTenantResp = { id: number; name: string } | { detail?: string };
-type CreateProjectResp = { id: number; tenant_id: number; name: string } | { detail?: string };
-type IssueKeyResp = { api_key: string; key_prefix: string; project_id: number } | { detail?: string };
 type ListKeyItem = { id: number; name: string; key_prefix: string; active: boolean; created_at: string; last_used_at?: string };
+type ProjectItem = { id: number; name: string; tenant_id: number; active: boolean };
 
 export default function DevelopersPage() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
   const { t, lang } = useI18n();
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [tenantName, setTenantName] = useState("Demo School");
-  const [tenantId, setTenantId] = useState<number | null>(null);
 
   const [projectName, setProjectName] = useState("Demo Project");
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
 
   const [keyName, setKeyName] = useState("default");
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -26,37 +23,113 @@ export default function DevelopersPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const t = localStorage.getItem("tma_token");
-    if (t) setAuthToken(t);
+    const stored = localStorage.getItem("tma_token");
+    if (stored) setAuthToken(stored);
   }, []);
 
-  // Auth flows removed from Developers page; use header buttons
+  const clearSession = (message?: string) => {
+    localStorage.removeItem("tma_token");
+    setAuthToken(null);
+    setProjects([]);
+    setProjectId(null);
+    setKeys([]);
+    setApiKey(null);
+    if (message) setMsg(message);
+  };
 
-  const createTenant = async () => {
-    setLoading(true);
-    setMsg("");
+  const listKeys = async (targetProjectId?: number, tokenOverride?: string) => {
+    const pid = targetProjectId ?? projectId;
+    const tokenValue = tokenOverride ?? authToken;
+    if (!pid || !tokenValue) return;
+    const r = await fetch(`${API_BASE}/v1/dev/projects/${pid}/keys`, { headers: { Authorization: `Bearer ${tokenValue}` } });
+    if (r.status === 401) {
+      clearSession(t("developers.sessionExpired"));
+      return;
+    }
+    const j: any = await r.json();
+    if (r.ok && Array.isArray(j)) setKeys(j);
+  };
+
+  const loadProjects = async (tokenOverride?: string) => {
+    const tokenValue = tokenOverride ?? authToken;
+    if (!tokenValue) return;
     try {
-      const r = await fetch("/api/admin/tenants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: tenantName }) });
+      const r = await fetch(`${API_BASE}/v1/dev/projects`, { headers: { Authorization: `Bearer ${tokenValue}` } });
+      if (r.status === 401) {
+        clearSession(t("developers.sessionExpired"));
+        return;
+      }
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
-      setTenantId(j.id);
-      setMsg(`Tenant created: ${j.name} (#${j.id})`);
+      if (Array.isArray(j)) {
+        setProjects(j);
+        if (j.length > 0) {
+          setProjectId((prev) => {
+            if (prev && j.some((p) => p.id === prev)) return prev;
+            return j[0].id;
+          });
+        } else {
+          setProjectId(null);
+        }
+      }
     } catch (e: any) {
-      setMsg(`Tenant error: ${e.message || e}`);
-    } finally {
-      setLoading(false);
+      setMsg(`Project list error: ${e.message || e}`);
     }
   };
+
+  useEffect(() => {
+    if (!authToken) {
+      setProjects([]);
+      setProjectId(null);
+      setKeys([]);
+      setApiKey(null);
+      return;
+    }
+
+    const tokenValue = authToken;
+    const tokenHeader = `Bearer ${tokenValue}`;
+
+    const fetchContext = async () => {
+      try {
+        const r = await fetch(`${API_BASE}/v1/auth/me`, { headers: { Authorization: tokenHeader } });
+        if (r.status === 401) {
+          clearSession(t("developers.sessionExpired"));
+          return;
+        }
+      } catch (e: any) {
+        setMsg(`Auth error: ${e?.message || e}`);
+      }
+
+      await loadProjects(tokenValue);
+    };
+
+    void fetchContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken]);
+
+  useEffect(() => {
+    if (!projectId || !authToken) {
+      setKeys([]);
+      return;
+    }
+    void listKeys(projectId, authToken);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, authToken]);
 
   const createProject = async () => {
     if (!authToken) { setMsg("먼저 로그인하세요."); return; }
     setLoading(true);
     setMsg("");
     try {
-      const r = await fetch(`${API_BASE}/v1/dev/projects`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: projectName }) });
+      const r = await fetch(`${API_BASE}/v1/dev/projects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ name: projectName }),
+      });
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setProjectId(j.id);
+      await loadProjects(authToken);
       setMsg(`Project created: ${j.name} (#${j.id})`);
     } catch (e: any) {
       setMsg(`Project error: ${e.message || e}`);
@@ -72,24 +145,21 @@ export default function DevelopersPage() {
     setMsg("");
     setApiKey(null);
     try {
-      const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: keyName }) });
+      const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ name: keyName }),
+      });
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setApiKey(j.api_key);
       setMsg("API 키가 발급되었습니다. 이 키는 발급 시 1회만 평문으로 표시됩니다.");
-      await listKeys();
+      await listKeys(projectId, authToken);
     } catch (e: any) {
       setMsg(`Issue key error: ${e.message || e}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  const listKeys = async () => {
-    if (!projectId || !authToken) return;
-    const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, { headers: { Authorization: `Bearer ${authToken}` } });
-    const j: any = await r.json();
-    if (r.ok && Array.isArray(j)) setKeys(j);
   };
 
   return (
@@ -102,23 +172,31 @@ export default function DevelopersPage() {
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* 기존 Admin 경로(선택 사용): 필요 시 사용 */}
-        {/* <div className="card space-y-3">
-          <div className="font-medium">(관리자) 테넌트 생성</div>
-          <input className="input" placeholder="테넌트 이름" value={tenantName} onChange={(e) => setTenantName(e.target.value)} />
-          <button className="btn w-fit" onClick={createTenant} disabled={loading}>테넌트 생성</button>
-          {tenantId && <div className="text-sm text-white/70">생성된 테넌트 ID: {tenantId}</div>}
-        </div> */}
-
         <div className="card space-y-3">
-          <div className="font-medium">2) {t("developers.createProject")}</div>
+          <div className="font-medium">1) {t("developers.createProject")}</div>
+          <div>
+            <label className="block text-xs mb-1">{t("developers.projectSelect")}</label>
+            <select className="input" value={projectId ?? ""} onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">{t("developers.projectSelectPlaceholder")}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {(!projects.length && authToken) && (
+              <div className="text-xs text-white/60 mt-1">{t("developers.noProjects")}</div>
+            )}
+          </div>
           <input className="input" placeholder="Project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-          <button className="btn w-fit" onClick={createProject} disabled={loading || !tenantId}>{t("developers.createProject")}</button>
-          {projectId && <div className="text-sm text-white/70">생성된 프로젝트 ID: {projectId}</div>}
+          <button className="btn w-fit" onClick={createProject} disabled={loading}>{t("developers.createProject")}</button>
+          {projectId && (
+            <div className="text-sm text-white/70">
+              {lang === "ko" ? `선택된 프로젝트 ID: ${projectId}` : `Selected project ID: ${projectId}`}
+            </div>
+          )}
         </div>
 
         <div className="card space-y-3 md:col-span-2">
-          <div className="font-medium">3) {t("developers.issueKey")}</div>
+          <div className="font-medium">2) {t("developers.issueKey")}</div>
           <div className="grid md:grid-cols-3 gap-3 items-end">
             <div>
               <label className="block text-xs mb-1">{t("developers.keyName")}</label>
@@ -145,7 +223,7 @@ export default function DevelopersPage() {
 
         <div className="card space-y-3 md:col-span-2">
           <div className="font-medium">{t("developers.keys.name")}</div>
-          <button className="btn w-fit" onClick={listKeys} disabled={!projectId}>{t("developers.refresh")}</button>
+          <button className="btn w-fit" onClick={() => listKeys(projectId, authToken ?? undefined)} disabled={!projectId || !authToken}>{t("developers.refresh")}</button>
           <div className="overflow-auto border border-white/10 rounded-lg">
             <table className="min-w-full text-sm">
               <thead className="bg-white/5">

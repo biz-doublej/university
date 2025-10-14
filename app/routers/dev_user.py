@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
-from ..models import Project, ApiKey, User
+from ..models import Project, ApiKey, User, Tenant
 from ..services.auth import get_user_from_token, generate_api_key
 
 
@@ -51,8 +51,12 @@ def issue_key(project_id: int, payload: dict, authorization: str | None = Header
     key_type = payload.get("key_type") or "api"
     if key_type not in {"api", "ai"}:
         raise HTTPException(status_code=400, detail="invalid_key_type")
-    if key_type == "ai" and user.role not in {"Admin"}:
-        raise HTTPException(status_code=403, detail="ai_key_requires_admin")
+    if key_type == "ai":
+        if user.role not in {"Admin"}:
+            raise HTTPException(status_code=403, detail="ai_key_requires_admin")
+        tenant = db.get(Tenant, user.tenant_id)
+        if not tenant or not tenant.ai_portal_enabled:
+            raise HTTPException(status_code=403, detail="ai_portal_not_enabled")
     token, row = generate_api_key(db, tenant_id=p.tenant_id, project_id=p.id, name=name, key_type=key_type)
     return {"api_key": token, "key_prefix": row.key_prefix, "project_id": p.id, "key_type": row.key_type}
 

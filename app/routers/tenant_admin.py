@@ -88,9 +88,9 @@ def ingest_data(
             student = Student(tenant_id=tenant_id, name=name, email=email)
         student.major = student_data.get("major", student.major)
         student.year = student_data.get("year", student.year)
-        meta = student.metadata or {}
+        meta = student.profile or {}
         meta.update(student_data.get("metadata", {}))
-        student.metadata = meta
+        student.profile = meta
         db.add(student)
         counts["students"] += 1
 

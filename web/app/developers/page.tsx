@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../components/i18n";
 
-type ListKeyItem = { id: number; name: string; key_prefix: string; key_type?: string; active: boolean; created_at: string; last_used_at?: string };
+type ListKeyItem = { id: number; name: string; key_prefix: string; key_type: string; active: boolean; created_at: string; last_used_at?: string };
 type ProjectItem = { id: number; name: string; tenant_id: number; active: boolean };
 
 export default function DevelopersPage() {
@@ -48,7 +48,17 @@ export default function DevelopersPage() {
       return;
     }
     const j: any = await r.json();
-    if (r.ok && Array.isArray(j)) setKeys(j);
+    if (r.ok && Array.isArray(j)) {
+      setKeys(j.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        key_prefix: item.key_prefix,
+        key_type: item.key_type || "api",
+        active: item.active,
+        created_at: item.created_at,
+        last_used_at: item.last_used_at,
+      })));
+    }
   };
 
   const loadProjects = async (tokenOverride?: string) => {
@@ -214,6 +224,11 @@ export default function DevelopersPage() {
             <div className="md:col-span-1">
               <button className="btn w-full" onClick={issueKey} disabled={loading || !projectId}>{t("developers.issueKey")}</button>
             </div>
+          </div>
+          <div className="text-xs text-white/60">
+            {keyType === "ai"
+              ? (lang === "ko" ? "AI 키는 승인된 학교 관리자만 발급할 수 있으며, 학생/교원 포털 연동에 사용됩니다." : "AI keys require school admin approval and activate the campus portal.")
+              : (lang === "ko" ? "API 키는 통합 및 개발을 위한 일반 키입니다." : "API keys are used for integrations and development.")}
           </div>
           {apiKey && (
             <div className="text-sm">

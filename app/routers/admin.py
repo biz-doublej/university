@@ -66,7 +66,7 @@ def create_project(req: CreateProjectReq, db: Session = Depends(get_db), x_admin
 
 class CreateKeyReq(BaseModel):
     name: str = "default"
-    key_type: str = Field(default="api", regex="^(api|ai)$")
+    key_type: str = Field(default="api", pattern="^(api|ai)$")
 
 
 @router.post("/projects/{project_id}/keys")

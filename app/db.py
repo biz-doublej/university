@@ -35,8 +35,12 @@ def _run_schema_upgrades() -> None:
             conn.execute(text("UPDATE api_keys SET key_type = 'api' WHERE key_type IS NULL"))
         # students.metadata column rename scenario -> ensure metadata exists
         student_cols = {col["name"] for col in inspector.get_columns("students")}
+        if "profile" in student_cols and "metadata" not in student_cols:
+            conn.execute(text("ALTER TABLE students RENAME COLUMN profile TO metadata"))
+            student_cols = {col["name"] for col in inspector.get_columns("students")}
         if "metadata" not in student_cols:
             conn.execute(text("ALTER TABLE students ADD COLUMN metadata TEXT DEFAULT '{}'"))
+        conn.execute(text("UPDATE students SET metadata='{}' WHERE metadata IS NULL"))
         # users.password_hash
         user_cols = {col["name"] for col in inspector.get_columns("users")}
         if "password_hash" not in user_cols:

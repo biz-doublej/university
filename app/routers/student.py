@@ -51,13 +51,14 @@ def get_profile(
     authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),
 ) -> StudentProfile:
-    _, student = _require_student(db, authorization)
+    user, student = _require_student(db, authorization)
     return StudentProfile(
         id=student.id,
         name=student.name,
         major=student.major,
         year=student.year,
         email=student.email,
+        university=user.university_name,
         metadata=student.metadata,
     )
 

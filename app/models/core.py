@@ -18,6 +18,7 @@ class Tenant(Base):
     locale: Mapped[str] = mapped_column(String(16), default="ko")
     plan: Mapped[str] = mapped_column(String(32), default="Essentials")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    ai_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class User(Base):
@@ -29,6 +30,8 @@ class User(Base):
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
     sso_subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    university_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    department_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
 
 class Room(Base):
@@ -144,6 +147,7 @@ class ApiKey(Base):
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
+    key_type: Mapped[str] = mapped_column(String(16), default="api")  # api | ai
     key_prefix: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     key_hash: Mapped[str] = mapped_column(String(128))  # hex sha256
     scopes: Mapped[dict] = mapped_column(JSON, default=dict)

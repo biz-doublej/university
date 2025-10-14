@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
-from ..models import Course, CourseReview, Enrollment, Student, User
+from ..models import Course, CourseReview, Enrollment, Student, User, Tenant
 from ..schemas import AdminDataUpload
 from ..services.auth import get_user_from_token
+from ..services.auth import generate_api_key
+from pydantic import BaseModel, Field
 
 
 router = APIRouter(prefix="/tenant-admin", tags=["tenant-admin"])
@@ -33,6 +35,7 @@ def tenant_summary(
 ) -> dict:
     user = _require_admin_user(db, authorization)
     tenant_id = user.tenant_id
+    tenant = db.get(Tenant, tenant_id)
     total_courses = db.query(Course).filter(Course.tenant_id == tenant_id).count()
     total_students = db.query(Student).filter(Student.tenant_id == tenant_id).count()
     total_enrollments = db.query(Enrollment).filter(Enrollment.tenant_id == tenant_id).count()
@@ -42,6 +45,7 @@ def tenant_summary(
         "students": total_students,
         "enrollments": total_enrollments,
         "reviews": total_reviews,
+        "ai_portal_enabled": bool(tenant.ai_portal_enabled if tenant else False),
     }
 
 
@@ -150,3 +154,30 @@ def ingest_data(
 
     db.commit()
     return counts
+
+
+class IssueAiKeyReq(BaseModel):
+    name: str = Field(default="school-portal", min_length=2)
+
+
+@router.post("/ai-key")
+def issue_ai_key(
+    payload: IssueAiKeyReq,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None or not tenant.ai_portal_enabled:
+        raise HTTPException(status_code=403, detail="ai_portal_not_enabled")
+
+    # AI keys are not tied to developer projects; store without project.
+    token, row = generate_api_key(
+        db,
+        tenant_id=tenant.id,
+        project_id=None,
+        name=payload.name,
+        key_type="ai",
+        scopes={"portal": "school"},
+    )
+    return {"ai_key": token, "key_prefix": row.key_prefix, "key_type": row.key_type}

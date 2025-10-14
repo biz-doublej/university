@@ -48,8 +48,13 @@ def issue_key(project_id: int, payload: dict, authorization: str | None = Header
     if p is None or p.tenant_id != user.tenant_id:
         raise HTTPException(status_code=404, detail="project_not_found")
     name = str(payload.get("name") or "default")
-    token, row = generate_api_key(db, tenant_id=p.tenant_id, project_id=p.id, name=name)
-    return {"api_key": token, "key_prefix": row.key_prefix, "project_id": p.id}
+    key_type = payload.get("key_type") or "api"
+    if key_type not in {"api", "ai"}:
+        raise HTTPException(status_code=400, detail="invalid_key_type")
+    if key_type == "ai" and user.role not in {"Admin"}:
+        raise HTTPException(status_code=403, detail="ai_key_requires_admin")
+    token, row = generate_api_key(db, tenant_id=p.tenant_id, project_id=p.id, name=name, key_type=key_type)
+    return {"api_key": token, "key_prefix": row.key_prefix, "project_id": p.id, "key_type": row.key_type}
 
 
 @router.get("/projects/{project_id}/keys")
@@ -63,6 +68,7 @@ def list_keys(project_id: int, authorization: str | None = Header(default=None, 
         {
             "id": k.id,
             "name": k.name,
+            "key_type": k.key_type,
             "key_prefix": k.key_prefix,
             "active": k.active,
             "created_at": k.created_at,
@@ -70,4 +76,3 @@ def list_keys(project_id: int, authorization: str | None = Header(default=None, 
         }
         for k in keys
     ]
-

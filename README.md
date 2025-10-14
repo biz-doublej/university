@@ -254,6 +254,8 @@ npm run dev
 - Admin 토큰 설정: 서버 환경변수 `ADMIN_TOKEN="<임의의 강한 토큰>"`
 - 테넌트 생성:
   - `POST /v1/admin/tenants` (헤더 `X-Admin-Token`) → `{ id, name }`
+- AI 포털 승인:
+  - `POST /v1/admin/tenants/{tenant_id}/ai_portal` { enabled } → 학교별 AI 포털 오픈 여부 제어
 - 프로젝트 생성:
   - `POST /v1/admin/projects` (헤더 `X-Admin-Token`) → `{ id, tenant_id }`
 - API 키 발급:
@@ -263,13 +265,19 @@ npm run dev
   - `X-API-Key: timora_<prefix>.<secret>`
   - `Authorization: Bearer timora_<prefix>.<secret>`
 - 키에 연결된 테넌트가 자동으로 선택됩니다. `X-Tenant-ID`는 옵션(오버라이드 목적)입니다.
+- 키 유형: `api`(기본) / `ai`
+  - `api` : 통합 API 호출용 (개발자/통합 파트너)
+  - `ai`  : 승인된 학교 전용 AI 포털 오픈용, 포털 발급 스코프 포함
 
 ### 사용자 가입/로그인 기반 발급 (요금제 없음)
 
-- 회원가입: `POST /v1/auth/signup` { email, password, tenant_name }
-  - 신규 테넌트 생성 + 사용자(Admin) 생성 + 세션 토큰 반환
+- 회원가입: `POST /v1/auth/signup` { email, password, role, university_name, department_name }
+  - 역할: Student / Faculty / Admin (학생·교수·관리자)
+  - `university_name`, `department_name`은 `data/한국대학교육협의회_대학별학과정보_20250108.csv` 기준 목록 검증
+  - 신규 테넌트는 선택한 대학교 명으로 자동 생성, 학생 회원은 학생 프로필 레코드 동시 생성
 - 로그인: `POST /v1/auth/login` { email, password } → 세션 토큰 반환
 - 내 정보: `GET /v1/auth/me` Authorization: Bearer tma.<payload>.<sig>
+- 대학교/학과 목록: `GET /v1/auth/catalog` → [{ university, departments[] }]
 - 개발자 엔드포인트(사용자 테넌트 한정):
   - `POST /v1/dev/projects` { name } → 프로젝트 생성
   - `GET /v1/dev/projects` → 내 테넌트 프로젝트 목록
@@ -292,6 +300,7 @@ npm run dev
 - 대학 관리자 API (`/v1/tenant-admin/*`)
   - `GET /v1/tenant-admin/summary` → 테넌트별 데이터 현황
   - `POST /v1/tenant-admin/ingest` → 강의/학생/수강/후기 데이터를 JSON 업로드
+  - `POST /v1/tenant-admin/ai-key` → AI 포털 전용 키 발급(글로벌 승인 필요)
 
 ### 웹 포털 구획 (동일 도메인 내 분리 진입)
 

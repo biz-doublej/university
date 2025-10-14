@@ -72,6 +72,7 @@ class StudentProfile(BaseModel):
     major: Optional[str]
     year: Optional[int]
     email: Optional[str]
+    university: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

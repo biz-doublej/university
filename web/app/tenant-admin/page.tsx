@@ -7,6 +7,7 @@ type Summary = {
   students: number;
   enrollments: number;
   reviews: number;
+  ai_portal_enabled?: boolean;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
@@ -39,6 +40,7 @@ export default function TenantAdminPortalPage() {
   const [payload, setPayload] = useState<string>(SAMPLE_PAYLOAD);
   const [msg, setMsg] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [aiKey, setAiKey] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("tma_token");
@@ -46,11 +48,11 @@ export default function TenantAdminPortalPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) {
-      setSummary(null);
-      return;
-    }
-    const run = async () => {
+    const load = async () => {
+      if (!token) {
+        setSummary(null);
+        return;
+      }
       try {
         const r = await fetch(`${API_BASE}/v1/tenant-admin/summary`, { headers: { Authorization: `Bearer ${token}` } });
         if (r.status === 401) {
@@ -65,8 +67,20 @@ export default function TenantAdminPortalPage() {
         setMsg(err?.message || String(err));
       }
     };
-    void run();
+    void load();
   }, [token]);
+
+  const loadSummary = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`${API_BASE}/v1/tenant-admin/summary`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) return;
+      const j = await r.json();
+      setSummary(j);
+    } catch (err: any) {
+      setMsg(err?.message || String(err));
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,10 +102,33 @@ export default function TenantAdminPortalPage() {
       const j = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setMsg(`업로드 완료: ${JSON.stringify(j)}`);
-      const refreshed = await fetch(`${API_BASE}/v1/tenant-admin/summary`, { headers: { Authorization: `Bearer ${token}` } });
-      setSummary(await refreshed.json());
+      await loadSummary();
     } catch (err: any) {
       setMsg(`업로드 실패: ${err?.message || err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const issueAiKey = async () => {
+    if (!token) {
+      setMsg("먼저 로그인하세요.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const r = await fetch(`${API_BASE}/v1/tenant-admin/ai-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: "portal" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      setAiKey(j.ai_key);
+      setMsg("AI 키가 발급되었습니다. 페이지 구성에 사용하세요.");
+      await loadSummary();
+    } catch (err: any) {
+      setMsg(err?.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -106,6 +143,8 @@ export default function TenantAdminPortalPage() {
     );
   }
 
+  const metrics = summary || { courses: 0, students: 0, enrollments: 0, reviews: 0, ai_portal_enabled: false };
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,16 +152,50 @@ export default function TenantAdminPortalPage() {
         <p className="text-white/70">학사 데이터를 업로드하고 학생/교원 포털에서 활용되는 AI 서비스를 제어합니다.</p>
       </div>
 
-      {summary && (
-        <div className="grid md:grid-cols-4 gap-3">
-          {Object.entries(summary).map(([key, value]) => (
-            <div key={key} className="card">
-              <div className="text-xs uppercase text-white/50">{key}</div>
-              <div className="text-2xl font-semibold">{value}</div>
-            </div>
-          ))}
+      <div className="grid md:grid-cols-5 gap-3">
+        <div className="card">
+          <div className="text-xs uppercase text-white/50">Courses</div>
+          <div className="text-2xl font-semibold">{metrics.courses}</div>
         </div>
-      )}
+        <div className="card">
+          <div className="text-xs uppercase text-white/50">Students</div>
+          <div className="text-2xl font-semibold">{metrics.students}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs uppercase text-white/50">Enrollments</div>
+          <div className="text-2xl font-semibold">{metrics.enrollments}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs uppercase text-white/50">Reviews</div>
+          <div className="text-2xl font-semibold">{metrics.reviews}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs uppercase text-white/50">AI Portal</div>
+          <div className="text-lg font-semibold">{metrics.ai_portal_enabled ? "Enabled" : "Pending"}</div>
+          <div className="text-xs text-white/60 mt-1">관리자 승인이 필요합니다.</div>
+        </div>
+      </div>
+
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">AI 포털 키 발급</div>
+            <div className="text-xs text-white/60">승인된 학교만 발급 가능합니다. 발급된 키는 1회만 표시됩니다.</div>
+          </div>
+          <button className="btn text-xs" onClick={issueAiKey} disabled={!metrics.ai_portal_enabled || loading}>
+            {metrics.ai_portal_enabled ? "AI Key 발급" : "승인 대기"}
+          </button>
+        </div>
+        {!metrics.ai_portal_enabled && (
+          <div className="text-xs text-white/60">글로벌 관리자에게 승인을 요청해주세요.</div>
+        )}
+        {aiKey && (
+          <div className="text-sm text-white/80">
+            <div>발급된 AI Key (한번만 표시):</div>
+            <code className="block bg-white/10 p-2 rounded mt-2 break-all">{aiKey}</code>
+          </div>
+        )}
+      </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -141,3 +214,26 @@ export default function TenantAdminPortalPage() {
     </div>
   );
 }
+  const issueAiKey = async () => {
+    if (!token) {
+      setMsg("먼저 로그인하세요.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const r = await fetch(`${API_BASE}/v1/tenant-admin/ai-key`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: "portal" }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      setAiKey(j.ai_key);
+      setMsg("AI 키가 발급되었습니다. 페이지 구성에 사용하세요.");
+      await loadSummary();
+    } catch (err: any) {
+      setMsg(err?.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  };

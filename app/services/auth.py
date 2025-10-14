@@ -30,7 +30,15 @@ def _gen_prefix(n: int = 10) -> str:
     return secrets.token_urlsafe(n)[:n]
 
 
-def generate_api_key(db: Session, *, tenant_id: int, project_id: Optional[int], name: str) -> tuple[str, ApiKey]:
+def generate_api_key(
+    db: Session,
+    *,
+    tenant_id: int,
+    project_id: Optional[int],
+    name: str,
+    key_type: str = "api",
+    scopes: Optional[dict] = None,
+) -> tuple[str, ApiKey]:
     """Create an API key and return the plaintext token and the DB row.
     Token format: timora_<prefix>.<secret>
     We store only prefix + hashed(secret).
@@ -43,9 +51,10 @@ def generate_api_key(db: Session, *, tenant_id: int, project_id: Optional[int], 
         tenant_id=tenant_id,
         project_id=project_id,
         name=name,
+        key_type=key_type,
         key_prefix=prefix,
         key_hash=key_hash,
-        scopes={},
+        scopes=scopes or {},
         active=True,
     )
     db.add(row)

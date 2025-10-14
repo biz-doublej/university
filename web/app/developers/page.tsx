@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../components/i18n";
 
-type ListKeyItem = { id: number; name: string; key_prefix: string; active: boolean; created_at: string; last_used_at?: string };
+type ListKeyItem = { id: number; name: string; key_prefix: string; key_type?: string; active: boolean; created_at: string; last_used_at?: string };
 type ProjectItem = { id: number; name: string; tenant_id: number; active: boolean };
 
 export default function DevelopersPage() {
@@ -16,6 +16,7 @@ export default function DevelopersPage() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
 
   const [keyName, setKeyName] = useState("default");
+  const [keyType, setKeyType] = useState<"api" | "ai">("api");
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [keys, setKeys] = useState<ListKeyItem[]>([]);
 
@@ -148,12 +149,13 @@ export default function DevelopersPage() {
       const r = await fetch(`${API_BASE}/v1/dev/projects/${projectId}/keys`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ name: keyName }),
+        body: JSON.stringify({ name: keyName, key_type: keyType }),
       });
       const j: any = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setApiKey(j.api_key);
-      setMsg("API 키가 발급되었습니다. 이 키는 발급 시 1회만 평문으로 표시됩니다.");
+      const message = keyType === "ai" ? (lang === "ko" ? "AI 키가 발급되었습니다. 발급 시 1회만 평문으로 표시됩니다." : "AI key issued. It will only be shown once.") : (lang === "ko" ? "API 키가 발급되었습니다. 이 키는 발급 시 1회만 평문으로 표시됩니다." : "API key issued. It is shown only once.");
+      setMsg(message);
       await listKeys(projectId, authToken);
     } catch (e: any) {
       setMsg(`Issue key error: ${e.message || e}`);
@@ -197,13 +199,20 @@ export default function DevelopersPage() {
 
         <div className="card space-y-3 md:col-span-2">
           <div className="font-medium">2) {t("developers.issueKey")}</div>
-          <div className="grid md:grid-cols-3 gap-3 items-end">
-            <div>
+          <div className="grid md:grid-cols-4 gap-3 items-end">
+            <div className="md:col-span-2">
               <label className="block text-xs mb-1">{t("developers.keyName")}</label>
               <input className="input" value={keyName} onChange={(e) => setKeyName(e.target.value)} />
             </div>
-            <div className="md:col-span-2">
-              <button className="btn" onClick={issueKey} disabled={loading || !projectId}>{t("developers.issueKey")}</button>
+            <div>
+              <label className="block text-xs mb-1">{t("developers.keyType")}</label>
+              <select className="input" value={keyType} onChange={(e) => setKeyType(e.target.value as "api" | "ai")}>
+                <option value="api">API</option>
+                <option value="ai">AI</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
+              <button className="btn w-full" onClick={issueKey} disabled={loading || !projectId}>{t("developers.issueKey")}</button>
             </div>
           </div>
           {apiKey && (
@@ -230,6 +239,7 @@ export default function DevelopersPage() {
                 <tr>
                   <th className="text-left px-3 py-2">{t("developers.keys.id")}</th>
                   <th className="text-left px-3 py-2">{t("developers.keys.name")}</th>
+                  <th className="text-left px-3 py-2">{t("developers.keys.type")}</th>
                   <th className="text-left px-3 py-2">{t("developers.keys.prefix")}</th>
                   <th className="text-left px-3 py-2">{t("developers.keys.active")}</th>
                   <th className="text-left px-3 py-2">{t("developers.keys.created")}</th>
@@ -241,6 +251,7 @@ export default function DevelopersPage() {
                   <tr key={k.id} className="odd:bg-white/0 even:bg-white/5">
                     <td className="px-3 py-2">{k.id}</td>
                     <td className="px-3 py-2">{k.name}</td>
+                    <td className="px-3 py-2 text-xs uppercase">{(k.key_type === "ai" ? "AI" : "API")}</td>
                     <td className="px-3 py-2">{k.key_prefix}</td>
                     <td className="px-3 py-2">{k.active ? (lang === "ko" ? "활성" : "Active") : (lang === "ko" ? "비활성" : "Inactive")}</td>
                     <td className="px-3 py-2">{k.created_at}</td>

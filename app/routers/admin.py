@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -66,6 +66,7 @@ def create_project(req: CreateProjectReq, db: Session = Depends(get_db), x_admin
 
 class CreateKeyReq(BaseModel):
     name: str = "default"
+    key_type: str = Field(default="api", regex="^(api|ai)$")
 
 
 @router.post("/projects/{project_id}/keys")
@@ -74,8 +75,8 @@ def issue_key(project_id: int, req: CreateKeyReq, db: Session = Depends(get_db),
     p = db.get(Project, project_id)
     if p is None:
         raise HTTPException(status_code=404, detail="project_not_found")
-    token, row = generate_api_key(db, tenant_id=p.tenant_id, project_id=p.id, name=req.name)
-    return {"api_key": token, "key_prefix": row.key_prefix, "project_id": p.id}
+    token, row = generate_api_key(db, tenant_id=p.tenant_id, project_id=p.id, name=req.name, key_type=req.key_type)
+    return {"api_key": token, "key_prefix": row.key_prefix, "project_id": p.id, "key_type": row.key_type}
 
 
 @router.get("/projects/{project_id}/keys")
@@ -86,6 +87,7 @@ def list_keys(project_id: int, db: Session = Depends(get_db), x_admin: Optional[
         {
             "id": k.id,
             "name": k.name,
+            "key_type": k.key_type,
             "key_prefix": k.key_prefix,
             "active": k.active,
             "created_at": k.created_at,
@@ -110,3 +112,18 @@ def revoke_key(key_id: int, req: RevokeKeyReq, db: Session = Depends(get_db), x_
     db.commit()
     return {"id": k.id, "active": k.active}
 
+
+class TenantAiPortalReq(BaseModel):
+    enabled: bool
+
+
+@router.post("/tenants/{tenant_id}/ai_portal")
+def set_ai_portal(tenant_id: int, req: TenantAiPortalReq, db: Session = Depends(get_db), x_admin: Optional[str] = Header(default=None, alias="X-Admin-Token")):
+    _require_admin(x_admin)
+    tenant = db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    tenant.ai_portal_enabled = bool(req.enabled)
+    db.add(tenant)
+    db.commit()
+    return {"tenant_id": tenant.id, "ai_portal_enabled": tenant.ai_portal_enabled}

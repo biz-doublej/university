@@ -37,6 +37,10 @@ def _run_schema_upgrades() -> None:
         student_cols = {col["name"] for col in inspector.get_columns("students")}
         if "metadata" not in student_cols:
             conn.execute(text("ALTER TABLE students ADD COLUMN metadata TEXT DEFAULT '{}'"))
+        # users.password_hash
+        user_cols = {col["name"] for col in inspector.get_columns("users")}
+        if "password_hash" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
 
 
 def init_db() -> None:

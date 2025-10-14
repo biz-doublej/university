@@ -109,11 +109,11 @@ export default function SignupPage() {
   };
 
   useEffect(() => {
-    if (!departments.includes(department)) {
+    if (!showDepartmentList && department && !departments.includes(department)) {
       setDepartment("");
       setDepartmentInput("");
     }
-  }, [departments, department]);
+  }, [departments, department, showDepartmentList]);
 
   useEffect(() => {
     if (!university) {

@@ -41,6 +41,10 @@ def _run_schema_upgrades() -> None:
         user_cols = {col["name"] for col in inspector.get_columns("users")}
         if "password_hash" not in user_cols:
             conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
+        if "university_name" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN university_name VARCHAR(255)"))
+        if "department_name" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN department_name VARCHAR(255)"))
 
 
 def init_db() -> None:

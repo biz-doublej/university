@@ -247,6 +247,7 @@ npm run dev
 
 - `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
 - `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
+- `TIMETABLE_SESSION_TOKEN` (백엔드에서 발급받은 `tma.*` 세션 토큰; 학생/관리자 계정으로 API 호출 시 사용)
 - 클라우드 배포 준비 체크리스트: `docs/gcp-prep.md`
 
 ### API Key 발급/사용 (Timora AI)

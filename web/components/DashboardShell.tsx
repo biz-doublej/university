@@ -1,13 +1,37 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { PropsWithChildren } from "react";
 
+const NAV_ITEMS = [
+  { href: "/dashboard/student", label: "학생" },
+  { href: "/dashboard/professor", label: "교수" },
+  { href: "/dashboard/admin", label: "관리자" },
+  { href: "/dashboard/developer", label: "개발자" },
+];
+
 export default function DashboardShell({ children }: PropsWithChildren) {
+  const pathname = usePathname();
+
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20 }}>
-      <nav style={{ marginBottom: 12 }}>
-        <a href="/dashboard/student" style={{ marginRight: 8 }}>학생</a>
-        <a href="/dashboard/professor" style={{ marginRight: 8 }}>교수</a>
-        <a href="/dashboard/admin" style={{ marginRight: 8 }}>관리자</a>
-        <a href="/dashboard/developer" style={{ marginRight: 8 }}>개발자</a>
+    <div className="mx-auto max-w-5xl px-5 py-6">
+      <nav className="mb-6 flex flex-wrap gap-3">
+        {NAV_ITEMS.map((item) => {
+          const active = pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`btn rounded-full px-5 py-2 text-sm ${
+                active ? "ring-2 ring-white/70" : "opacity-80 hover:opacity-100"
+              }`}
+              aria-current={active ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
       <main>{children}</main>
     </div>

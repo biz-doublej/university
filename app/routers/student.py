@@ -16,7 +16,7 @@ from ..schemas import (
     StudentProfile,
 )
 from ..services.auth import get_user_from_token
-from ..services.recommendation import generate_course_recommendations
+from ..services.recommendation import generate_course_recommendations, generate_personalized_recommendations
 
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -70,7 +70,24 @@ def get_recommendations(
     db: Session = Depends(get_db),
 ) -> list[CourseRecommendation]:
     _, student = _require_student(db, authorization)
-    return generate_course_recommendations(db, student.id, limit=limit)
+    # Use personalized recommendations by default
+    try:
+        return generate_personalized_recommendations(db, student.id, limit=limit)
+    except Exception:
+        return generate_course_recommendations(db, student.id, limit=limit)
+
+
+
+@router.post("/auto-enroll", response_model=EnrollmentItem)
+def auto_enroll(
+    payload: EnrollmentRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> EnrollmentItem:
+    # Simple endpoint: create enrollment request for student (accepts recommendation)
+    _, student = _require_student(db, authorization)
+    # Reuse upsert_enrollment logic by calling it
+    return upsert_enrollment(payload, authorization, db)
 
 
 @router.get("/enrollments", response_model=List[EnrollmentItem])

@@ -142,6 +142,54 @@ export default function StudentPortalPage() {
             새로고침
           </button>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!token) return;
+              setLoading(true);
+              try {
+                const body = { student_id: profile?.id };
+                const r = await fetch(`${API_BASE}/v1/timetable/recommend`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+                const j = await r.json();
+                setMsg(`추천 시간표 생성 완료: ${j.stats?.assignment_count || 0} 개 배정`);
+              } catch (err: any) {
+                setMsg(err?.message || String(err));
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            나만의 시간표 생성
+          </button>
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!token) return;
+              if (!recommendations.length) {
+                setMsg('추천 강의가 없습니다. 먼저 새로고침 하세요.');
+                return;
+              }
+              // auto-enroll top recommendation
+              const top = recommendations[0];
+              setLoading(true);
+              try {
+                const payload = { course_id: top.course_id, status: 'requested' };
+                const r = await fetch(`${API_BASE}/v1/student/auto-enroll`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+                const j = await r.json();
+                setEnrollments((s) => [j, ...s]);
+                setMsg('자동 수강신청 요청이 생성되었습니다.');
+              } catch (err: any) {
+                setMsg(err?.message || String(err));
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            추천 자동수강 신청 (Top1)
+          </button>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-3">
           {recommendations.map((rec) => (
             <div key={rec.course_id} className="card space-y-2">

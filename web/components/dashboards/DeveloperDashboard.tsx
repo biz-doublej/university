@@ -32,20 +32,26 @@ export default function DeveloperDashboard({ university, schoolCode }: Props) {
           ),
           description:
             "테넌트 코드를 입력하면 해당 캠퍼스 데이터에 즉시 접속합니다.",
+          href: "/dashboard/developer/school-access",
+          ctaLabel: "상세 관리",
         },
         {
           title: "현재 선택 학교",
           description: university,
+          href: "/dashboard/developer/current-school",
+          ctaLabel: "학교 전환",
         },
         {
           title: "플랫폼 인프라 상태",
           description:
             "API 응답 속도, 파이프라인 처리량, 배치 작업 현황 등을 실시간으로 모니터링합니다.",
+          href: "/dashboard/developer/platform-status",
         },
         {
           title: "역할 및 권한 부여",
           description:
             "관리자와 운영자에게 필요한 권한을 부여하고 감사 로그를 확인하세요.",
+          href: "/dashboard/developer/role-management",
         },
       ]}
     />

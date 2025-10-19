@@ -1,9 +1,12 @@
+import Link from "next/link";
 import React, { ReactNode } from "react";
 
 type Section = {
   title: string;
   description?: string;
   content?: ReactNode;
+  href?: string;
+  ctaLabel?: string;
 };
 
 type Theme = {
@@ -80,6 +83,14 @@ export default function DashboardTemplate({
             )}
             {section.content && (
               <div className="mt-3 text-sm text-white/90">{section.content}</div>
+            )}
+            {section.href && (
+              <Link
+                className="btn mt-4 inline-flex w-full justify-center rounded-full px-4 py-2 text-sm"
+                href={section.href}
+              >
+                {section.ctaLabel ?? "바로가기"}
+              </Link>
             )}
           </section>
         ))}

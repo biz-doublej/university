@@ -20,12 +20,13 @@ def group_slots(slots: list[SlotLite], group_size: int) -> list[list[int]]:
         by_day[s.day].append(s)
     # Sort by start time lexicographically (works for HH:MM format)
     for day in by_day:
-        by_day[day].sort(key=lambda x: x.start)
+        by_day[day].sort(key=lambda x: x.period)
 
     blocks: list[list[int]] = []
     for day, day_slots in by_day.items():
         for i in range(0, len(day_slots) - group_size + 1):
             block = day_slots[i : i + group_size]
+            if block[-1].period - block[0].period != group_size - 1:
+                continue
             blocks.append([s.id for s in block])
     return blocks
-

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from ...models import Course, Room, Timeslot, Assignment
 from .types import CourseLite, RoomLite, SlotLite, AssignmentLite
 from .filters import filter_rooms_for_course
 from .grouping import group_slots
+from .calendar_rules import normalize_slot
 
 
 def _load_lite(db: Session, tenant_id: int) -> tuple[list[CourseLite], list[RoomLite], list[SlotLite]]:
@@ -34,17 +35,27 @@ def _load_lite(db: Session, tenant_id: int) -> tuple[list[CourseLite], list[Room
         )
         for r in db.query(Room).filter(Room.tenant_id == tenant_id).all()
     ]
-    slots = [
-        SlotLite(
-            id=s.id,
-            tenant_id=s.tenant_id,
-            day=s.day,
-            start=s.start,
-            end=s.end,
-            granularity=s.granularity,
+    slots: list[SlotLite] = []
+    seen_day_period: set[tuple[str, int]] = set()
+    for s in db.query(Timeslot).filter(Timeslot.tenant_id == tenant_id).all():
+        window = normalize_slot(s.day, s.start, s.end)
+        if window is None:
+            continue
+        key = (window.day, window.period)
+        if key in seen_day_period:
+            continue
+        seen_day_period.add(key)
+        slots.append(
+            SlotLite(
+                id=s.id,
+                tenant_id=s.tenant_id,
+                day=window.day,
+                start=window.start,
+                end=window.end,
+                granularity=s.granularity,
+                period=window.period,
+            )
         )
-        for s in db.query(Timeslot).filter(Timeslot.tenant_id == tenant_id).all()
-    ]
     return courses, rooms, slots
 
 
@@ -61,6 +72,14 @@ def warm_start_greedy(
 
     # Generate grouped slot blocks
     slot_blocks = group_slots(slots, group_size)
+    if not slots or not slot_blocks:
+        stats = {
+            "total_courses": len(courses),
+            "assigned_courses": 0,
+            "assignment_count": 0,
+            "note": "no_valid_slots",
+        }
+        return [], stats
 
     # Track availability
     room_day_block_used: Dict[Tuple[int, Tuple[int, ...]], bool] = {}
@@ -69,7 +88,8 @@ def warm_start_greedy(
 
     for course in courses:
         # Each course may require multiple hours per week; we assign one block per hour unit.
-        remaining = max(1, course.hours_per_week // max(1, (slots[0].granularity if slots else 60) // 60))
+        hours_required = max(1, course.hours_per_week)
+        blocks_needed = max(1, (hours_required + group_size - 1) // group_size)
         allowed_rooms = filter_rooms_for_course(course, rooms) if use_forbidden else rooms
         # Prefer rooms: lab then by capacity ascending (tight fit)
         allowed_rooms = sorted(
@@ -79,7 +99,7 @@ def warm_start_greedy(
 
         assigned_blocks = 0
         for room in allowed_rooms:
-            if assigned_blocks >= remaining:
+            if assigned_blocks >= blocks_needed:
                 break
             for block in slot_blocks:
                 key = (room.id, tuple(block))
@@ -89,7 +109,7 @@ def warm_start_greedy(
                 out.append(AssignmentLite(course_id=course.id, room_id=room.id, slot_ids=list(block)))
                 room_day_block_used[key] = True
                 assigned_blocks += 1
-                if assigned_blocks >= remaining:
+                if assigned_blocks >= blocks_needed:
                     break
         course_assigned[course.id] = assigned_blocks > 0
 
@@ -118,4 +138,3 @@ def persist_assignments(db: Session, tenant_id: int, assignments: list[Assignmen
             )
         )
     db.commit()
-

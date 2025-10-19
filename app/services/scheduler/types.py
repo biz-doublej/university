@@ -33,6 +33,7 @@ class SlotLite:
     start: str
     end: str
     granularity: int
+    period: int
 
 
 @dataclass
@@ -40,5 +41,4 @@ class AssignmentLite:
     course_id: int
     room_id: int
     slot_ids: list[int]
-
 

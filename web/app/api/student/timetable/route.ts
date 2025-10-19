@@ -1,28 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { apiFetch } from "@lib/api";
+import { forwardResponse, getSessionAuthHeader } from "@lib/server-api";
 
 export const runtime = "nodejs";
-
-function getAuthHeader(): string | null {
-  const token =
-    process.env.TIMETABLE_SESSION_TOKEN ||
-    process.env.NEXT_PUBLIC_TIMETABLE_SESSION_TOKEN ||
-    null;
-  if (!token) return null;
-  return token.startsWith("Bearer ") ? token : `Bearer ${token}`;
-}
-
-async function forwardResponse(res: Response) {
-  let data: any = null;
-  try {
-    data = await res.json();
-  } catch {
-    const text = await res.text();
-    data = text ? { raw: text } : {};
-  }
-  return NextResponse.json(data, { status: res.status });
-}
 
 function toSnakeCasePrefs(preferences: any | undefined) {
   if (!preferences) return undefined;
@@ -46,10 +27,12 @@ function toSnakeCasePrefs(preferences: any | undefined) {
 }
 
 export async function POST(request: Request) {
-  const auth = getAuthHeader();
-  if (!auth) {
+  let auth: string;
+  try {
+    auth = getSessionAuthHeader();
+  } catch (error: any) {
     return NextResponse.json(
-      { error: "Missing TIMETABLE_SESSION_TOKEN environment variable" },
+      { error: error?.message || String(error) },
       { status: 500 },
     );
   }

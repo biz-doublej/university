@@ -6,10 +6,20 @@ import { forwardResponse, getSessionAuthHeader } from "@lib/server-api";
 export const runtime = "nodejs";
 
 export async function GET() {
+  let auth: string;
   try {
-    const res = await apiFetch("/v1/student/profile", {
+    auth = getSessionAuthHeader();
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || String(error) },
+      { status: 500 },
+    );
+  }
+
+  try {
+    const res = await apiFetch("/v1/faculty/courses", {
       headers: {
-        Authorization: getSessionAuthHeader(),
+        Authorization: auth,
       },
     });
     return await forwardResponse(res);

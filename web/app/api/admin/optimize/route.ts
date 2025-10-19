@@ -5,22 +5,6 @@ import { forwardResponse, getSessionAuthHeader } from "@lib/server-api";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  try {
-    const res = await apiFetch("/v1/student/enrollments", {
-      headers: {
-        Authorization: getSessionAuthHeader(),
-      },
-    });
-    return await forwardResponse(res);
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || String(error) },
-      { status: 500 },
-    );
-  }
-}
-
 export async function POST(request: Request) {
   let auth: string;
   try {
@@ -31,6 +15,7 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
   let payload: any = {};
   try {
     payload = await request.json();
@@ -38,22 +23,16 @@ export async function POST(request: Request) {
     payload = {};
   }
 
-  const courseId = payload.course_id ?? payload.courseId;
-  if (!courseId) {
-    return NextResponse.json(
-      { error: "course_id is required" },
-      { status: 400 },
-    );
-  }
-
   const backendPayload = {
-    course_id: Number(courseId),
-    status: payload.status ?? "requested",
-    term: payload.term ?? null,
+    policy_version: payload.policy_version ?? payload.policyVersion ?? 1,
+    week: payload.week ?? "2025-01",
+    solver: payload.solver ?? "greedy",
+    slot_group: payload.slot_group ?? payload.slotGroup ?? 1,
+    forbid_checks: payload.forbid_checks ?? payload.forbidChecks ?? true,
   };
 
   try {
-    const res = await apiFetch("/v1/student/enrollments", {
+    const res = await apiFetch("/v1/optimize", {
       method: "POST",
       headers: {
         Authorization: auth,

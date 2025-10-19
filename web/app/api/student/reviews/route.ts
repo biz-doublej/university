@@ -5,22 +5,6 @@ import { forwardResponse, getSessionAuthHeader } from "@lib/server-api";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  try {
-    const res = await apiFetch("/v1/student/enrollments", {
-      headers: {
-        Authorization: getSessionAuthHeader(),
-      },
-    });
-    return await forwardResponse(res);
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || String(error) },
-      { status: 500 },
-    );
-  }
-}
-
 export async function POST(request: Request) {
   let auth: string;
   try {
@@ -31,15 +15,14 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
   let payload: any = {};
   try {
     payload = await request.json();
   } catch {
     payload = {};
   }
-
-  const courseId = payload.course_id ?? payload.courseId;
-  if (!courseId) {
+  if (!payload.course_id && !payload.courseId) {
     return NextResponse.json(
       { error: "course_id is required" },
       { status: 400 },
@@ -47,13 +30,18 @@ export async function POST(request: Request) {
   }
 
   const backendPayload = {
-    course_id: Number(courseId),
-    status: payload.status ?? "requested",
-    term: payload.term ?? null,
+    course_id: Number(payload.course_id ?? payload.courseId),
+    rating_overall: payload.rating_overall ?? payload.ratingOverall ?? null,
+    rating_difficulty: payload.rating_difficulty ?? payload.ratingDifficulty ?? null,
+    rating_instructor: payload.rating_instructor ?? payload.ratingInstructor ?? null,
+    tags: payload.tags ?? [],
+    comment: payload.comment ?? "",
+    semester: payload.semester ?? null,
+    answers: payload.answers ?? [],
   };
 
   try {
-    const res = await apiFetch("/v1/student/enrollments", {
+    const res = await apiFetch("/v1/student/reviews", {
       method: "POST",
       headers: {
         Authorization: auth,

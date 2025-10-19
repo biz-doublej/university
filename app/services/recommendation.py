@@ -108,6 +108,55 @@ def generate_personalized_recommendations(db: Session, student_id: int, limit: i
     return recommendations[:limit]
 
 
+def analyze_review_and_update_profile(db: Session, student_id: int, course_id: int, answers: list[int], comment: str | None) -> dict:
+    """Simple analysis:
+    - Aggregate Likert answers to a preference vector
+    - Extract keywords from comment (very naive word-count) and store top keywords in student.profile
+    - Return analysis summary used by downstream recommenders
+    This is intentionally lightweight; for production you may replace with an NLP model.
+    """
+    from ..models import Student
+    import re
+
+    student = db.get(Student, student_id)
+    if student is None:
+        raise ValueError("student_not_found")
+
+    # normalize answers (1..5) and compute average
+    vec = [int(a) for a in answers[:4]] if answers else []
+    avg = sum(vec) / len(vec) if vec else None
+
+    keywords = []
+    if comment:
+        words = re.findall(r"[가-힣a-zA-Z0-9]{2,}", comment)
+        freq: dict[str, int] = {}
+        for w in words:
+            w2 = w.lower()
+            freq[w2] = freq.get(w2, 0) + 1
+        sorted_kw = sorted(freq.items(), key=lambda kv: kv[1], reverse=True)
+        keywords = [k for k, _ in sorted_kw[:5]]
+
+    # store in student.profile under 'review_signals'
+    meta = student.profile or {}
+    review_signals = meta.get('review_signals', {})
+    review_signals[str(course_id)] = {
+        'answers': vec,
+        'avg': avg,
+        'keywords': keywords,
+    }
+    meta['review_signals'] = review_signals
+    # also add preferred_tags from keywords for personalization
+    prefs = meta.get('preferred_tags', [])
+    for k in keywords:
+        if k not in prefs:
+            prefs.append(k)
+    meta['preferred_tags'] = prefs
+    student.profile = meta
+    db.add(student)
+    db.commit()
+    return {'avg': avg, 'keywords': keywords}
+
+
 
 def _summarize_reviews(score: Optional[float], count: int) -> CourseInsight:
     if not score or count == 0:

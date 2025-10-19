@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ReviewModal from "../../components/ReviewModal";
 
 type StudentProfile = {
   id: number;
@@ -40,6 +41,9 @@ export default function StudentPortalPage() {
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [msg, setMsg] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewCourseId, setReviewCourseId] = useState<number | null>(null);
+  const [reviewCourseName, setReviewCourseName] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("tma_token");
@@ -237,6 +241,16 @@ export default function StudentPortalPage() {
                   <td className="px-3 py-2">{en.status}</td>
                   <td className="px-3 py-2">{en.term || "-"}</td>
                   <td className="px-3 py-2">{new Date(en.created_at).toLocaleString()}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        setReviewCourseId(en.course_id);
+                        setReviewCourseName(en.course_name || null);
+                        setReviewOpen(true);
+                      }}
+                    >후기 작성</button>
+                  </td>
                 </tr>
               ))}
               {!enrollments.length && (
@@ -251,6 +265,23 @@ export default function StudentPortalPage() {
 
       {msg && <div className="text-sm text-rose-300">{msg}</div>}
       {loading && <div className="text-sm text-white/60">불러오는 중…</div>}
+      <ReviewModal
+        open={reviewOpen}
+        courseId={reviewCourseId}
+        courseName={reviewCourseName}
+        token={token}
+        onClose={() => setReviewOpen(false)}
+        onSubmitted={(resp) => {
+          setMsg('후기가 제출되어 개인화에 반영되었습니다.');
+          // optionally refresh enrollments or recommendations
+          void (async () => {
+            if (!token) return;
+            const r = await fetch(`${API_BASE}/v1/student/recommendations`, { headers: { Authorization: `Bearer ${token}` } });
+            const j = await r.json();
+            if (Array.isArray(j)) setRecommendations(j);
+          })();
+        }}
+      />
     </div>
   );
 }

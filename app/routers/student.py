@@ -16,7 +16,7 @@ from ..schemas import (
     StudentProfile,
 )
 from ..services.auth import get_user_from_token
-from ..services.recommendation import generate_course_recommendations, generate_personalized_recommendations
+from ..services.recommendation import generate_course_recommendations, generate_personalized_recommendations, analyze_review_and_update_profile
 
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -184,4 +184,11 @@ def submit_review(
     )
     db.add(review)
     db.commit()
-    return {"status": "created"}
+    # run lightweight analysis to update student's profile/preferences
+    analysis = {}
+    try:
+        analysis = analyze_review_and_update_profile(db, student.id, payload.course_id, payload.answers or [], payload.comment)
+    except Exception:
+        # don't fail the request if analysis fails
+        analysis = {}
+    return {"status": "created", "analysis": analysis}

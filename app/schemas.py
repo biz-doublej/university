@@ -100,6 +100,8 @@ class CourseReviewRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     comment: Optional[str] = None
     semester: Optional[str] = None
+    # Four Likert-style answers (1..5) for custom questions (e.g., 내용/난이도/평가/강의력)
+    answers: list[int] = Field(default_factory=list)
 
 
 class FacultyCourseOverview(BaseModel):

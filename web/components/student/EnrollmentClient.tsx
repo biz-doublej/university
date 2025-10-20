@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type {
+  EnrollmentItem,
+  StudentProfile,
+  TimetableRow,
+} from "./types";
+import ScheduleGrid from "./ScheduleGrid";
+
 const DAYS = [
   { value: "Mon", label: "월" },
   { value: "Tue", label: "화" },
@@ -11,57 +18,6 @@ const DAYS = [
 ];
 
 const PERIODS = Array.from({ length: 9 }, (_, i) => i + 1);
-
-type StudentProfile = {
-  id: number;
-  name: string | null;
-  email: string | null;
-  major: string | null;
-  year: number | null;
-};
-
-type TimetableSlot = {
-  timeslot_id: number;
-  day: string;
-  day_display: string;
-  period: number;
-  start: string;
-  end: string;
-  label: string;
-};
-
-type TimetableRow = {
-  course: {
-    id?: number;
-    code?: string;
-    name?: string;
-    hours_per_week?: number;
-    expected_enrollment?: number;
-    needs_lab?: boolean;
-  };
-  room?: {
-    id: number;
-    name?: string;
-    type?: string;
-    capacity?: number;
-    building?: string | null;
-  } | null;
-  slots: TimetableSlot[];
-  review?: {
-    average_overall?: number | null;
-    review_count?: number;
-  };
-};
-
-type EnrollmentItem = {
-  id: number;
-  course_id: number;
-  course_code: string | null;
-  course_name: string | null;
-  status: string;
-  term: string | null;
-  created_at: string;
-};
 
 type Props = {
   university: string;
@@ -113,25 +69,6 @@ export default function EnrollmentClient({ university }: Props) {
     }
     return map;
   }, [enrollments]);
-
-  const scheduleGrid = useMemo(() => {
-    const grid = new Map<string, { label: string; course: string; room: string }>();
-    for (const row of timetable) {
-      const courseName = courseLabel(row.course);
-      const roomName =
-        row.room?.name ||
-        (row.room?.building ? `${row.room.building} ${row.room.type ?? ""}` : "-");
-      for (const slot of row.slots) {
-        const key = `${slot.day}-${slot.period}`;
-        grid.set(key, {
-          label: slot.label,
-          course: courseName,
-          room: roomName,
-        });
-      }
-    }
-    return grid;
-  }, [timetable]);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -501,60 +438,7 @@ export default function EnrollmentClient({ university }: Props) {
         )}
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-black/20 p-6 shadow-inner">
-        <h2 className="text-xl font-semibold text-white">주간 시간표 미리보기</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full table-fixed border-collapse text-sm text-white/80">
-            <thead>
-              <tr>
-                <th className="w-24 border border-white/10 bg-white/10 px-3 py-2 text-left font-medium text-white/70">
-                  교시
-                </th>
-                {DAYS.map((day) => (
-                  <th
-                    key={day.value}
-                    className="border border-white/10 bg-white/10 px-3 py-2 text-left font-medium text-white/70"
-                  >
-                    {day.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {PERIODS.map((period) => (
-                <tr key={period}>
-                  <td className="border border-white/5 px-3 py-2 text-white/60">
-                    {period}교시
-                    <div className="text-xs text-white/40">
-                      {`${(8 + period).toString().padStart(2, "0")}:00`}
-                    </div>
-                  </td>
-                  {DAYS.map((day) => {
-                    const cell = scheduleGrid.get(`${day.value}-${period}`);
-                    return (
-                      <td
-                        key={`${day.value}-${period}`}
-                        className="border border-white/5 px-3 py-3 align-top"
-                      >
-                        {cell ? (
-                          <div className="rounded-xl bg-indigo-500/20 p-2 shadow-sm shadow-indigo-500/30">
-                            <div className="text-sm font-semibold text-white">
-                              {cell.course}
-                            </div>
-                            <div className="text-xs text-white/70">{cell.room}</div>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-white/30">비어있음</div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <ScheduleGrid rows={timetable} heading="주간 시간표 미리보기" />
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg">
         <div className="flex flex-wrap items-center justify-between gap-3">

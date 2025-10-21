@@ -19,6 +19,7 @@ class Tenant(Base):
     plan: Mapped[str] = mapped_column(String(32), default="Essentials")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     ai_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    enrollment_open: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class User(Base):

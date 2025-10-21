@@ -45,6 +45,7 @@ def tenant_summary(
         "enrollments": total_enrollments,
         "reviews": total_reviews,
         "ai_portal_enabled": bool(tenant.ai_portal_enabled if tenant else False),
+        "enrollment_open": bool(tenant.enrollment_open if tenant else False),
     }
 
 
@@ -180,3 +181,23 @@ def issue_ai_key(
         scopes={"portal": "school"},
     )
     return {"ai_key": token, "key_prefix": row.key_prefix, "key_type": row.key_type}
+
+
+class EnrollmentToggleReq(BaseModel):
+    open: bool = Field(default=False)
+
+
+@router.post("/enrollment-window")
+def set_enrollment_window(
+    payload: EnrollmentToggleReq,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    tenant.enrollment_open = bool(payload.open)
+    db.add(tenant)
+    db.commit()
+    return {"enrollment_open": tenant.enrollment_open}

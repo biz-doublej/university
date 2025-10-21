@@ -1,0 +1,31 @@
+import { NextResponse } from "next/server";
+
+import { apiFetch } from "@lib/api";
+import { forwardResponse, getSessionAuthHeader } from "@lib/server-api";
+
+export const runtime = "nodejs";
+
+export async function GET() {
+  let auth: string;
+  try {
+    auth = getSessionAuthHeader();
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || String(error) },
+      { status: 500 },
+    );
+  }
+  try {
+    const res = await apiFetch("/v1/student/enrollment_status", {
+      headers: {
+        Authorization: auth,
+      },
+    });
+    return await forwardResponse(res);
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || String(error) },
+      { status: 500 },
+    );
+  }
+}

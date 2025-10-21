@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
 
 from .config import get_settings
 from .db import init_db, get_db
@@ -29,6 +30,12 @@ def create_app() -> FastAPI:
         from .db import SessionLocal
 
         with SessionLocal() as db:
+            try:
+                db.execute(text("ALTER TABLE tenants ADD COLUMN enrollment_open BOOLEAN DEFAULT 0"))
+                db.commit()
+            except OperationalError:
+                db.rollback()
+
             stmt = select(Tenant).where(Tenant.name == settings.default_tenant_name)
             existing = db.execute(stmt).scalar_one_or_none()
             if existing is None:
@@ -46,4 +53,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

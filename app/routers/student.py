@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
-from ..models import Course, CourseReview, Enrollment, Student, User
+from ..models import Course, CourseReview, Enrollment, Student, Tenant, User
 from ..schemas import (
     CourseRecommendation,
     CourseReviewRequest,
@@ -126,6 +126,9 @@ def upsert_enrollment(
     db: Session = Depends(get_db),
 ) -> EnrollmentItem:
     _, student = _require_student(db, authorization)
+    tenant = db.get(Tenant, student.tenant_id)
+    if tenant is None or not tenant.enrollment_open:
+        raise HTTPException(status_code=403, detail="enrollment_closed")
     course = db.get(Course, payload.course_id)
     if course is None or course.tenant_id != student.tenant_id:
         raise HTTPException(status_code=404, detail="course_not_found")
@@ -192,3 +195,13 @@ def submit_review(
         # don't fail the request if analysis fails
         analysis = {}
     return {"status": "created", "analysis": analysis}
+
+
+@router.get("/enrollment_status")
+def enrollment_status(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    _, student = _require_student(db, authorization)
+    tenant = db.get(Tenant, student.tenant_id)
+    return {"open": bool(tenant.enrollment_open if tenant else False)}

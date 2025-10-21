@@ -20,12 +20,14 @@ export function getAdminToken(): string {
 }
 
 export async function forwardResponse(res: Response) {
-  let data: any = null;
-  try {
-    data = await res.json();
-  } catch {
-    const text = await res.text();
-    data = text ? { raw: text } : {};
+  const raw = await res.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { raw };
+    }
   }
   return NextResponse.json(data, { status: res.status });
 }

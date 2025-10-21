@@ -250,6 +250,16 @@ npm run dev
 - `TIMETABLE_SESSION_TOKEN` (백엔드에서 발급받은 `tma.*` 세션 토큰; 학생/관리자 계정으로 API 호출 시 사용)
 - 클라우드 배포 준비 체크리스트: `docs/gcp-prep.md`
 
+#### TIMETABLE_SESSION_TOKEN 자동 발급
+
+- 서비스 계정 자격 정보(이메일/비밀번호)를 환경변수 `SERVICE_ACCOUNT_EMAIL`, `SERVICE_ACCOUNT_PASSWORD` 또는 CLI 인자로 전달합니다.
+- 필요하면 대학교/학과 정보도 `SERVICE_ACCOUNT_UNIVERSITY`, `SERVICE_ACCOUNT_DEPARTMENT`로 지정 가능합니다. (Student/Faculty 역할은 학과 필수)
+- `python scripts/bootstrap_service_token.py` 실행 시 다음 동작을 자동으로 수행합니다:
+  - 계정이 없으면 `/v1/auth/signup`으로 생성 (409면 무시)
+  - `/v1/auth/login`으로 세션 토큰을 발급받아 `.env`, `web/.env.local`에 `TIMETABLE_SESSION_TOKEN=` 값을 갱신
+- `--skip-env-write` 옵션으로 파일 수정 없이 토큰만 출력할 수 있으며, `--print-token`으로 항상 stdout 노출이 가능합니다.
+- 백엔드 베이스 URL이 다르면 `--api-base` 옵션을 사용하세요. (기본 `http://localhost:8000`)
+
 ### API Key 발급/사용 (Timora AI)
 
 - 웹 포털: `http://localhost:3000/developers` (로그인 → 프로젝트 선택/생성 → API 키 발급)

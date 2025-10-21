@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import ScheduleGrid from "./ScheduleGrid";
-import type { EnrollmentItem, TimetableRow } from "./types";
+import ScheduleBreakdown from "./ScheduleBreakdown";
+import type { EnrollmentItem, TimetableBreakdown, TimetableRow } from "./types";
 
 type Props = {
   university: string;
@@ -13,6 +14,7 @@ export default function StudentScheduleClient({ university }: Props) {
   const [timetable, setTimetable] = useState<TimetableRow[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [stats, setStats] = useState<Record<string, any> | null>(null);
+  const [breakdown, setBreakdown] = useState<TimetableBreakdown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +33,7 @@ export default function StudentScheduleClient({ university }: Props) {
       }
       setTimetable(data?.timetable || []);
       setStats(data?.stats || null);
+      setBreakdown(data?.breakdown || null);
     } catch (err: any) {
       setError(err?.message || "시간표 조회 중 문제가 발생했습니다.");
     } finally {
@@ -106,6 +109,21 @@ export default function StudentScheduleClient({ university }: Props) {
       </section>
 
       <ScheduleGrid rows={timetable} heading="AI 기반 주간 시간표" />
+
+      {breakdown && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ScheduleBreakdown
+            title="학과별 시간표 분포"
+            entries={breakdown.by_department}
+            hint="AI 추천 결과를 학과/코호트 기준으로 묶었습니다."
+          />
+          <ScheduleBreakdown
+            title="학년별 시간표 분포"
+            entries={breakdown.by_year}
+            hint="시간표 블록을 학년 추정치로 구분했습니다."
+          />
+        </div>
+      )}
 
       <section className="rounded-3xl border border-white/10 bg-black/30 p-6 shadow-lg backdrop-blur">
         <h2 className="text-xl font-semibold text-white">내 수강신청 과목</h2>

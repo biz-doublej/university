@@ -24,6 +24,7 @@ export type TimetableRow = {
     hours_per_week?: number;
     expected_enrollment?: number;
     needs_lab?: boolean;
+    cohort?: string | null;
   };
   room?: {
     id: number;
@@ -37,6 +38,10 @@ export type TimetableRow = {
     average_overall?: number | null;
     review_count?: number;
   };
+  grouping?: {
+    department?: string;
+    year?: string;
+  };
 };
 
 export type EnrollmentItem = {
@@ -47,4 +52,21 @@ export type EnrollmentItem = {
   status: string;
   term: string | null;
   created_at: string;
+};
+
+export type TimetableBreakdownEntry = {
+  label: string;
+  course_count: number;
+  slot_count: number;
+  slot_hours: number;
+  courses: {
+    course?: TimetableRow["course"];
+    room?: TimetableRow["room"];
+    slots: TimetableSlot[];
+  }[];
+};
+
+export type TimetableBreakdown = {
+  by_department: TimetableBreakdownEntry[];
+  by_year: TimetableBreakdownEntry[];
 };

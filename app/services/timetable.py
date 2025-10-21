@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from sqlalchemy import func
@@ -97,6 +98,62 @@ def _select_assignments(
             break
 
     return selected
+
+
+def _infer_department_label(course_meta: dict[str, Any], student: Student) -> str:
+    cohort = str(course_meta.get("cohort") or "").strip()
+    if cohort:
+        return cohort
+    if student.major:
+        return student.major
+    return "미분류"
+
+
+def _infer_year_label(course_meta: dict[str, Any], student: Student) -> str:
+    cohort = str(course_meta.get("cohort") or "")
+    match = re.search(r"(\d{1,2})", cohort)
+    if match:
+        try:
+            year = int(match.group(1))
+            if 1 <= year <= 6:
+                return f"{year}학년"
+        except ValueError:
+            pass
+    if student.year:
+        return f"{student.year}학년"
+    return "미분류"
+
+
+def _group_by(
+    rows: list[dict[str, Any]],
+    *,
+    key: str,
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        grouping = row.get("grouping", {})
+        label = grouping.get(key) or "미분류"
+        entry = groups.setdefault(
+            label,
+            {
+                "label": label,
+                "course_count": 0,
+                "slot_count": 0,
+                "courses": [],
+            },
+        )
+        entry["course_count"] += 1
+        entry["slot_count"] += len(row.get("slots", []))
+        entry["courses"].append(
+            {
+                "course": row.get("course"),
+                "room": row.get("room"),
+                "slots": row.get("slots", []),
+            }
+        )
+    for entry in groups.values():
+        entry["slot_hours"] = entry["slot_count"]  # 슬롯 1개=1시간 기준
+    return sorted(groups.values(), key=lambda item: item["course_count"], reverse=True)
 
 
 def recommend_timetable_for_student(
@@ -218,6 +275,7 @@ def recommend_timetable_for_student(
             "hours_per_week": course.hours_per_week,
             "expected_enrollment": course.expected_enrollment,
             "needs_lab": course.needs_lab,
+            "cohort": course.cohort,
         }
         for course in course_rows
     }
@@ -270,12 +328,19 @@ def recommend_timetable_for_student(
         ]
         slot_entries.sort(key=lambda item: (day_order[item["day"]], item["period"]))
 
+        dept_label = _infer_department_label(course_meta, student)
+        year_label = _infer_year_label(course_meta, student)
+
         rows.append(
             {
                 "course": course_meta,
                 "room": room_meta,
                 "slots": slot_entries,
                 "review": review_map.get(assignment.course_id, {"average_overall": None, "review_count": 0}),
+                "grouping": {
+                    "department": dept_label,
+                    "year": year_label,
+                },
             }
         )
 
@@ -309,4 +374,9 @@ def recommend_timetable_for_student(
     if filters_applied:
         stats["applied_filters"] = filters_applied
 
-    return {"timetable": rows, "stats": stats}
+    breakdown = {
+        "by_department": _group_by(rows, key="department"),
+        "by_year": _group_by(rows, key="year"),
+    }
+
+    return {"timetable": rows, "stats": stats, "breakdown": breakdown}

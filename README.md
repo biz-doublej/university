@@ -310,9 +310,10 @@ npm run dev
   - `GET /v1/faculty/courses/{id}/reviews` → 최신 학생 후기 열람
   - `POST /v1/faculty/courses/{id}/reviews/ack` → 강의 운영 메모/응답 기록
 - 대학 관리자 API (`/v1/tenant-admin/*`)
-  - `GET /v1/tenant-admin/summary` → 테넌트별 데이터 현황
+  - `GET /v1/tenant-admin/summary` → 테넌트별 데이터 현황 (`enrollment_open` 포함)
   - `POST /v1/tenant-admin/ingest` → 강의/학생/수강/후기 데이터를 JSON 업로드
   - `POST /v1/tenant-admin/ai-key` → AI 포털 전용 키 발급(글로벌 승인 필요)
+  - `POST /v1/tenant-admin/enrollment-window` → 수강신청 창(OPEN/CLOSE) 토글
 
 ### 웹 포털 구획 (동일 도메인 내 분리 진입)
 

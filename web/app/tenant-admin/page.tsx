@@ -8,6 +8,7 @@ type Summary = {
   enrollments: number;
   reviews: number;
   ai_portal_enabled?: boolean;
+  enrollment_open?: boolean;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
@@ -41,6 +42,7 @@ export default function TenantAdminPortalPage() {
   const [msg, setMsg] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [aiKey, setAiKey] = useState<string | null>(null);
+  const [togglingEnrollment, setTogglingEnrollment] = useState<boolean>(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("tma_token");
@@ -134,6 +136,29 @@ export default function TenantAdminPortalPage() {
     }
   };
 
+  const toggleEnrollmentWindow = async (open: boolean) => {
+    if (!token) {
+      setMsg("먼저 로그인하세요.");
+      return;
+    }
+    try {
+      setTogglingEnrollment(true);
+      const r = await fetch(`${API_BASE}/v1/tenant-admin/enrollment-window`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ open }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      setMsg(open ? "수강신청을 오픈했습니다." : "수강신청을 마감했습니다.");
+      await loadSummary();
+    } catch (err: any) {
+      setMsg(err?.message || String(err));
+    } finally {
+      setTogglingEnrollment(false);
+    }
+  };
+
   if (!token) {
     return (
       <div className="space-y-4">
@@ -143,7 +168,7 @@ export default function TenantAdminPortalPage() {
     );
   }
 
-  const metrics = summary || { courses: 0, students: 0, enrollments: 0, reviews: 0, ai_portal_enabled: false };
+  const metrics = summary || { courses: 0, students: 0, enrollments: 0, reviews: 0, ai_portal_enabled: false, enrollment_open: false };
 
   return (
     <div className="space-y-6">
@@ -152,7 +177,7 @@ export default function TenantAdminPortalPage() {
         <p className="text-white/70">학사 데이터를 업로드하고 학생/교원 포털에서 활용되는 AI 서비스를 제어합니다.</p>
       </div>
 
-      <div className="grid md:grid-cols-5 gap-3">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div className="card">
           <div className="text-xs uppercase text-white/50">Courses</div>
           <div className="text-2xl font-semibold">{metrics.courses}</div>
@@ -173,6 +198,24 @@ export default function TenantAdminPortalPage() {
           <div className="text-xs uppercase text-white/50">AI Portal</div>
           <div className="text-lg font-semibold">{metrics.ai_portal_enabled ? "Enabled" : "Pending"}</div>
           <div className="text-xs text-white/60 mt-1">관리자 승인이 필요합니다.</div>
+        </div>
+        <div className="card space-y-2">
+          <div className="text-xs uppercase text-white/50">Enrollment Window</div>
+          <div className="text-lg font-semibold">{metrics.enrollment_open ? "Open" : "Closed"}</div>
+          <button
+            className="btn text-xs"
+            onClick={() => toggleEnrollmentWindow(!metrics.enrollment_open)}
+            disabled={togglingEnrollment}
+          >
+            {togglingEnrollment
+              ? "처리 중..."
+              : metrics.enrollment_open
+              ? "수강신청 마감"
+              : "수강신청 오픈"}
+          </button>
+          <div className="text-xs text-white/60">
+            학생 포털에서 수강신청 가능 여부를 제어합니다.
+          </div>
         </div>
       </div>
 
@@ -214,26 +257,3 @@ export default function TenantAdminPortalPage() {
     </div>
   );
 }
-  const issueAiKey = async () => {
-    if (!token) {
-      setMsg("먼저 로그인하세요.");
-      return;
-    }
-    try {
-      setLoading(true);
-      const r = await fetch(`${API_BASE}/v1/tenant-admin/ai-key`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: "portal" }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
-      setAiKey(j.ai_key);
-      setMsg("AI 키가 발급되었습니다. 페이지 구성에 사용하세요.");
-      await loadSummary();
-    } catch (err: any) {
-      setMsg(err?.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  };

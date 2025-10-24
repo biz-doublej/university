@@ -44,6 +44,7 @@ export default function EnrollmentClient({ university }: Props) {
   const [timetable, setTimetable] = useState<TimetableRow[]>([]);
   const [stats, setStats] = useState<Record<string, any> | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
+  const [enrollmentOpen, setEnrollmentOpen] = useState<boolean | null>(null);
   const [loadingTimetable, setLoadingTimetable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
@@ -96,6 +97,20 @@ export default function EnrollmentClient({ university }: Props) {
     }
   }, []);
 
+  const loadEnrollmentStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/student/enrollment-status");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "수강신청 상태를 불러오지 못했습니다.");
+      }
+      setEnrollmentOpen(Boolean(data?.open));
+    } catch (err: any) {
+      setEnrollmentOpen(false);
+      setEnrollError((prev) => prev ?? err?.message ?? "수강신청 상태를 확인할 수 없습니다.");
+    }
+  }, []);
+
   const fetchTimetable = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoadingTimetable(true);
@@ -130,7 +145,7 @@ export default function EnrollmentClient({ university }: Props) {
 
   useEffect(() => {
     const bootstrap = async () => {
-      await Promise.all([loadProfile(), loadEnrollments()]);
+      await Promise.all([loadProfile(), loadEnrollments(), loadEnrollmentStatus()]);
       await fetchTimetable({ silent: true });
     };
     bootstrap();
@@ -150,6 +165,10 @@ export default function EnrollmentClient({ university }: Props) {
   };
 
   const handleEnroll = async (courseId: number, status: "requested" | "dropped") => {
+    if (enrollmentOpen === false) {
+      setEnrollError("현재 수강신청 기간이 아닙니다. 관리자에게 문의하세요.");
+      return;
+    }
     setEnrollError(null);
     setSubmittingCourse(courseId);
     try {
@@ -212,6 +231,12 @@ export default function EnrollmentClient({ university }: Props) {
           </div>
         )}
       </section>
+
+      {enrollmentOpen === false && (
+        <div className="rounded-3xl border border-amber-400/40 bg-amber-500/10 p-5 text-sm text-amber-100">
+          현재 수강신청 기간이 아닙니다. 관리자 승인 후 다시 시도해주세요.
+        </div>
+      )}
 
       <section className="rounded-3xl border border-white/10 bg-black/30 p-6 shadow-lg backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -405,8 +430,8 @@ export default function EnrollmentClient({ university }: Props) {
                       <button
                         type="button"
                         onClick={() => handleEnroll(courseId, "dropped")}
-                        disabled={isSubmitting}
-                        className="rounded-full border border-rose-400/70 px-4 py-2 text-sm text-rose-200 hover:bg-rose-500/10"
+                        disabled={isSubmitting || enrollmentOpen === false}
+                        className="rounded-full border border-rose-400/70 px-4 py-2 text-sm text-rose-200 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isSubmitting ? "취소 중..." : "수강 취소"}
                       </button>
@@ -414,8 +439,8 @@ export default function EnrollmentClient({ university }: Props) {
                       <button
                         type="button"
                         onClick={() => handleEnroll(courseId, "requested")}
-                        disabled={isSubmitting}
-                        className="btn rounded-full px-5 py-2 text-sm"
+                        disabled={isSubmitting || enrollmentOpen === false}
+                        className="btn rounded-full px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isSubmitting ? "신청 중..." : "수강 신청"}
                       </button>

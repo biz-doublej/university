@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "../../components/i18n";
+import { getDashboardRoute, saveSession } from "../../lib/session";
 
 type CatalogItem = {
   university: string;
@@ -149,8 +150,8 @@ export default function SignupPage() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
-      localStorage.setItem("tma_token", j.token);
-      router.push("/developers");
+      saveSession(j.token, j.user);
+      router.push(getDashboardRoute(j.user.role));
     } catch (e: any) {
       setMsg(e.message || String(e));
     } finally {

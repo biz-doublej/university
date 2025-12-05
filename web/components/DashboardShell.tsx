@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { href: "/dashboard/student", label: "학생" },
   { href: "/dashboard/professor", label: "교수" },
   { href: "/dashboard/admin", label: "관리자" },
-  { href: "/dashboard/developer", label: "개발자" },
 ];
 
 export default function DashboardShell({ children }: PropsWithChildren) {

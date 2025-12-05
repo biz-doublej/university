@@ -26,6 +26,7 @@ body {
     radial-gradient(900px 420px at 50% 120%, var(--glow-warm), transparent 65%),
     var(--bg);
   color: var(--fg);
+  font-family: "Inter", "Noto Sans KR", system-ui, -apple-system, sans-serif;
 }
 
 a {

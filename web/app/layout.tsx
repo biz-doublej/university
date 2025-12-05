@@ -2,7 +2,6 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { AuthNav } from "../components/auth-nav";
 import { I18nProvider } from "../components/i18n";
-import { SiteNav } from "../components/site-nav";
 import { SiteFooter } from "../components/site-footer";
 import { BrandTagline } from "../components/brand";
 
@@ -18,14 +17,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <I18nProvider>
           <header className="border-b border-white/10">
             <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
-              <div>
+              <div className="space-y-1">
                 <div className="text-lg font-semibold brand">Timora AI</div>
                 <BrandTagline />
               </div>
-              <div className="flex items-center gap-4">
-                <SiteNav />
-                <AuthNav />
-              </div>
+              <AuthNav />
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>

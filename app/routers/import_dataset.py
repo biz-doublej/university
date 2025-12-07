@@ -176,6 +176,7 @@ def import_dataset(
         capacity = int(capacity_str) if capacity_str.isdigit() else 30
         class_type = get("class_type")
         needs_lab_flag = True if ("실습" in class_type) else False
+        department = get("department")
 
         # Room upsert
         room_key = (room_name, building)
@@ -214,6 +215,7 @@ def import_dataset(
                 code=code,
                 name=name,
                 hours_per_week=hours_pw,
+                department=department,
                 needs_lab=needs_lab_flag,
                 expected_enrollment=expected,
             )
@@ -221,6 +223,10 @@ def import_dataset(
             db.flush()
             existing_courses[code] = c
             created["courses"] += 1
+        elif code and code in existing_courses and department:
+            existing = existing_courses[code]
+            existing.department = department
+            db.add(existing)
 
     db.commit()
     return {"imported": True, "file": os.path.basename(path), "created": created}

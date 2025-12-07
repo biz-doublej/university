@@ -9,6 +9,7 @@ type Summary = {
   reviews: number;
   ai_portal_enabled?: boolean;
   enrollment_open?: boolean;
+  enrollment_open_until?: string | null;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
@@ -33,7 +34,24 @@ const SAMPLE_PAYLOAD = JSON.stringify(
   },
   null,
   2,
-);
+  );
+
+function toLocalDateTime(iso?: string | null) {
+  if (!iso) return "";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(
+    parsed.getHours(),
+  )}:${pad(parsed.getMinutes())}`;
+}
+
+function formatDeadline(iso?: string | null) {
+  if (!iso) return "미정";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return "미정";
+  return parsed.toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+}
 
 export default function TenantAdminPortalPage() {
   const [token, setToken] = useState<string | null>(null);

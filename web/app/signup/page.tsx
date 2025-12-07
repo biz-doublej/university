@@ -26,6 +26,8 @@ const toChosung = (text: string) =>
     })
     .join("");
 
+const SUPPORTED_UNIVERSITY_KEYWORD = "경복대";
+
 const matchesQuery = (target: string, query: string) => {
   if (!query) return true;
   const normTarget = target.toLowerCase();
@@ -78,6 +80,9 @@ export default function SignupPage() {
     setDepartmentInput(department);
   }, [department]);
 
+  const normalizedUniversity = university.trim();
+  const supportedUniversity = normalizedUniversity.toLowerCase().includes(SUPPORTED_UNIVERSITY_KEYWORD);
+  const unsupportedUniversity = normalizedUniversity && !supportedUniversity;
   const departments = useMemo(() => {
     const matched = catalog.find((item) => item.university === university);
     return matched ? matched.departments : [];
@@ -128,6 +133,11 @@ export default function SignupPage() {
     setMsg("");
     if (!university) {
       setMsg(t("signup.errorUniversity"));
+      setLoading(false);
+      return;
+    }
+    if (unsupportedUniversity) {
+      setMsg(t("signup.unsupportedUniversity"));
       setLoading(false);
       return;
     }
@@ -217,6 +227,9 @@ export default function SignupPage() {
           ) : (
             <input className="input" value={university} onChange={(e) => setUniversity(e.target.value)} placeholder={t("signup.university")} />
           )}
+          {unsupportedUniversity && (
+            <div className="text-sm text-amber-300">{t("signup.unsupportedUniversity")}</div>
+          )}
         </div>
         {(role !== "Admin" || departments.length > 0 || !hasCatalog) && (
           <div className="space-y-1">
@@ -261,7 +274,7 @@ export default function SignupPage() {
             )}
           </div>
         )}
-        <button className="btn" disabled={loading} type="submit">{t("auth.signup")}</button>
+        <button className="btn" disabled={loading || unsupportedUniversity} type="submit">{t("auth.signup")}</button>
         {msg && <div className="text-sm text-red-300">{msg}</div>}
       </form>
       <div className="text-sm text-white/70 mt-3">{t("signup.haveAccount")} <a href="/login" className="hover:underline">{t("signup.loginLink")}</a></div>

@@ -1,16 +1,25 @@
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Course, CourseReview, Enrollment, Student, User, Tenant
+from ..models import (
+    Course,
+    CourseReview,
+    CurriculumActivation,
+    Enrollment,
+    Student,
+    Tenant,
+    User,
+)
 from ..schemas import AdminDataUpload
 from ..services.auth import get_user_from_token, generate_api_key
-from pydantic import BaseModel, Field
 
 
 router = APIRouter(prefix="/tenant-admin", tags=["tenant-admin"])
@@ -46,6 +55,9 @@ def tenant_summary(
         "reviews": total_reviews,
         "ai_portal_enabled": bool(tenant.ai_portal_enabled if tenant else False),
         "enrollment_open": bool(tenant.enrollment_open if tenant else False),
+        "enrollment_open_until": tenant.enrollment_open_until.isoformat()
+        if tenant and tenant.enrollment_open_until
+        else None,
     }
 
 
@@ -69,9 +81,11 @@ def ingest_data(
             select(Course).where(Course.tenant_id == tenant_id, Course.code == code)
         ).scalar_one_or_none()
         if course is None:
-            course = Course(tenant_id=tenant_id, code=code, name=name)
+            course = Course(tenant_id=tenant_id, code=code, name=name, department=course_data.get("department"))
         course.hours_per_week = course_data.get("hours_per_week", course.hours_per_week)
         course.cohort = course_data.get("cohort", course.cohort)
+        dept_name = course_data.get("department")
+        course.department = dept_name or course.department
         course.needs_lab = course_data.get("needs_lab", course.needs_lab)
         course.expected_enrollment = course_data.get("expected_enrollment", course.expected_enrollment)
         db.add(course)
@@ -156,6 +170,81 @@ def ingest_data(
     return counts
 
 
+def _summarize_curriculum_data(payload: dict[str, Any] | None) -> dict[str, int]:
+    summary: dict[str, int] = {}
+    if not payload:
+        return summary
+    for key, value in payload.items():
+        if isinstance(value, (list, tuple, set)):
+            summary[key] = len(value)
+    return summary
+
+
+class CurriculumActivationReq(BaseModel):
+    department: str = Field(min_length=1)
+    data: dict[str, Any] = Field(default_factory=dict)
+    active_until: Optional[datetime] = None
+    activate: bool = Field(default=True)
+
+
+@router.get("/curriculum")
+def list_curriculum(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> List[dict[str, Any]]:
+    user = _require_admin_user(db, authorization)
+    entries = (
+        db.query(CurriculumActivation)
+        .filter(CurriculumActivation.tenant_id == user.tenant_id)
+        .order_by(CurriculumActivation.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": entry.id,
+            "department": entry.department,
+            "active_until": entry.active_until.isoformat() if entry.active_until else None,
+            "active": bool(entry.active),
+            "created_at": entry.created_at.isoformat(),
+            "data_summary": _summarize_curriculum_data(entry.data),
+        }
+        for entry in entries
+    ]
+
+
+@router.post("/curriculum")
+def create_curriculum(
+    payload: CurriculumActivationReq,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    entry = CurriculumActivation(
+        tenant_id=user.tenant_id,
+        department=payload.department.strip() or "전체",
+        data=payload.data or {},
+        active_until=payload.active_until,
+        active=bool(payload.activate),
+    )
+    db.add(entry)
+    tenant.enrollment_open = bool(payload.activate)
+    tenant.enrollment_open_until = payload.active_until if payload.activate else None
+    db.add(tenant)
+    db.commit()
+    db.refresh(entry)
+    return {
+        "id": entry.id,
+        "department": entry.department,
+        "active_until": entry.active_until.isoformat() if entry.active_until else None,
+        "active": entry.active,
+        "created_at": entry.created_at.isoformat(),
+        "data_summary": _summarize_curriculum_data(entry.data),
+    }
+
+
 class IssueAiKeyReq(BaseModel):
     name: str = Field(default="school-portal", min_length=2)
 
@@ -185,6 +274,7 @@ def issue_ai_key(
 
 class EnrollmentToggleReq(BaseModel):
     open: bool = Field(default=False)
+    expires_at: Optional[datetime] = None
 
 
 @router.post("/enrollment-window")
@@ -198,6 +288,15 @@ def set_enrollment_window(
     if tenant is None:
         raise HTTPException(status_code=404, detail="tenant_not_found")
     tenant.enrollment_open = bool(payload.open)
+    if payload.open:
+        tenant.enrollment_open_until = payload.expires_at
+    else:
+        tenant.enrollment_open_until = None
     db.add(tenant)
     db.commit()
-    return {"enrollment_open": tenant.enrollment_open}
+    return {
+        "enrollment_open": tenant.enrollment_open,
+        "enrollment_open_until": tenant.enrollment_open_until.isoformat()
+        if tenant.enrollment_open_until
+        else None,
+    }

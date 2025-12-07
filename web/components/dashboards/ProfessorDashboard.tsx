@@ -1,41 +1,49 @@
-import React from "react";
-import DashboardTemplate from "./DashboardTemplate";
+import RoleDashboard from "./RoleDashboard";
 
 type Props = { university: string };
 
 export default function ProfessorDashboard({ university }: Props) {
+  const stats = [
+    { label: "강의 관리", value: "12건" },
+    { label: "평가 히트맵", value: "98%" },
+    { label: "피드백", value: "4.6/5" },
+  ];
+  const sections = [
+    {
+      title: "강의 운영 대시보드",
+      description:
+        "현재 개설된 강의, 정원 현황, 수강신청 추이를 실시간으로 모니터링합니다.",
+      actionLabel: "강의 보기",
+    },
+    {
+      title: "일정 자동 조정",
+      description:
+        "AI는 교수 일정, 학과 캘린더, 실습실 여유를 고려하여 최적의 강의 시간을 추천합니다.",
+      actionLabel: "추천 일정 보기",
+    },
+    {
+      title: "학생 피드백 분석",
+      description:
+        "수업 만족도와 질의 응답 통계를 시각화해 교육 개선 포인트를 제시합니다.",
+      actionLabel: "피드백 확인",
+    },
+    {
+      title: "과제·평가 관리",
+      description:
+        "과제, 루브릭, 성적 마감일을 공유하고 자동 리마인더를 설정해 둡니다.",
+      actionLabel: "평가 계획",
+    },
+  ];
+
   return (
-    <DashboardTemplate
-      title={`${university} 교수 대시보드`}
-      subtitle="Faculty Portal"
-      description="강의 운영과 학생 피드백을 한 번에 확인하고, AI 기반 일정 추천으로 강의 계획을 최적화하세요."
-      theme={{ primary: "#f97316", secondary: "#facc15" }}
-      sections={[
-        {
-          title: "수강신청 현황",
-          description:
-            "강의별 신청 인원과 대기자 데이터를 실시간으로 파악하고, 정원 조정 요청을 빠르게 처리합니다.",
-          href: "/dashboard/professor/enrollments",
-        },
-        {
-          title: "강의 일정 관리",
-          description:
-            "개인/학과 일정과 연동된 교수 시간표를 확인하고, 빈 슬롯에 대한 AI 추천을 받아보세요.",
-          href: "/dashboard/professor/schedule",
-        },
-        {
-          title: "학생 피드백",
-          description:
-            "학생 후기와 만족도 지표를 시각화하여 교육 품질을 분석할 수 있습니다.",
-          href: "/dashboard/professor/feedback",
-        },
-        {
-          title: "과제 및 평가 계획",
-          description:
-            "평가 일정, 루브릭, 제출 현황 등을 한 화면에서 정리하고 공유하세요.",
-          href: "/dashboard/professor/assessments",
-        },
-      ]}
+    <RoleDashboard
+      university={university}
+      heroTitle="교수 맞춤 포털"
+      heroSubtitle="Faculty Portal"
+      heroDescription="강의·학생·커뮤니케이션 흐름을 AI로 연결해 보다 집중된 수업 운영이 가능합니다."
+      gradient={{ from: "rgba(248,113,113,0.9)", to: "rgba(251,191,36,0.6)" }}
+      stats={stats}
+      sections={sections}
     />
   );
 }

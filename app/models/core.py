@@ -20,6 +20,7 @@ class Tenant(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     ai_portal_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     enrollment_open: Mapped[bool] = mapped_column(Boolean, default=False)
+    enrollment_open_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class User(Base):
@@ -57,6 +58,7 @@ class Course(Base):
     name: Mapped[str] = mapped_column(String(255))
     hours_per_week: Mapped[int] = mapped_column(Integer, default=3)
     cohort: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     needs_lab: Mapped[bool] = mapped_column(Boolean, default=False)
     expected_enrollment: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -118,6 +120,19 @@ class Calendar(Base):
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), index=True)
     sharing_url: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CurriculumActivation(Base):
+    __tablename__ = "curriculum_activations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    department: Mapped[str] = mapped_column(String(128), default="전체")
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    active_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AuditLog(Base):

@@ -101,6 +101,9 @@ def _select_assignments(
 
 
 def _infer_department_label(course_meta: dict[str, Any], student: Student) -> str:
+    department = str(course_meta.get("department") or "").strip()
+    if department:
+        return department
     cohort = str(course_meta.get("cohort") or "").strip()
     if cohort:
         return cohort
@@ -269,13 +272,14 @@ def recommend_timetable_for_student(
 
     course_map = {
         course.id: {
-            "id": course.id,
-            "code": course.code,
-            "name": course.name,
-            "hours_per_week": course.hours_per_week,
-            "expected_enrollment": course.expected_enrollment,
-            "needs_lab": course.needs_lab,
-            "cohort": course.cohort,
+        "id": course.id,
+        "code": course.code,
+        "name": course.name,
+        "hours_per_week": course.hours_per_week,
+        "expected_enrollment": course.expected_enrollment,
+        "needs_lab": course.needs_lab,
+        "cohort": course.cohort,
+        "department": course.department,
         }
         for course in course_rows
     }

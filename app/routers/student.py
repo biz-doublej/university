@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from datetime import datetime
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
@@ -127,7 +128,12 @@ def upsert_enrollment(
 ) -> EnrollmentItem:
     _, student = _require_student(db, authorization)
     tenant = db.get(Tenant, student.tenant_id)
-    if tenant is None or not tenant.enrollment_open:
+    now = datetime.utcnow()
+    if (
+        tenant is None
+        or not tenant.enrollment_open
+        or (tenant.enrollment_open_until and tenant.enrollment_open_until < now)
+    ):
         raise HTTPException(status_code=403, detail="enrollment_closed")
     course = db.get(Course, payload.course_id)
     if course is None or course.tenant_id != student.tenant_id:
@@ -201,7 +207,10 @@ def submit_review(
 def enrollment_status(
     authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     _, student = _require_student(db, authorization)
     tenant = db.get(Tenant, student.tenant_id)
-    return {"open": bool(tenant.enrollment_open if tenant else False)}
+    return {
+        "open": bool(tenant.enrollment_open if tenant else False),
+        "open_until": tenant.enrollment_open_until.isoformat() if tenant and tenant.enrollment_open_until else None,
+    }

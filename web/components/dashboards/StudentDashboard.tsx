@@ -10,6 +10,13 @@ export default function StudentDashboard({ university }: Props) {
   ];
   const sections = [
     {
+      title: "수강 및 편성 통합",
+      description:
+        "학과별 데이터 업로드, 신청 창 열기, AI 배정까지 하나의 화면에서 실행하세요.",
+      actionLabel: "통합 열기",
+      actionHref: "/dashboard/student/integration",
+    },
+    {
       title: "맞춤형 시간표 구성",
       description:
         "교강사·교시·실습실 조건을 고려한 AI 추천으로 빈틈없는 스케줄을 만듭니다.",

@@ -61,6 +61,7 @@ export default function TenantAdminPortalPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [aiKey, setAiKey] = useState<string | null>(null);
   const [togglingEnrollment, setTogglingEnrollment] = useState<boolean>(false);
+  const [enrollmentWindowEnd, setEnrollmentWindowEnd] = useState<string>("");
 
   useEffect(() => {
     const stored = localStorage.getItem("tma_token");
@@ -83,6 +84,7 @@ export default function TenantAdminPortalPage() {
         }
         const j = await r.json();
         setSummary(j);
+        setEnrollmentWindowEnd(toLocalDateTime(j.enrollment_open_until));
       } catch (err: any) {
         setMsg(err?.message || String(err));
       }
@@ -97,6 +99,7 @@ export default function TenantAdminPortalPage() {
       if (!r.ok) return;
       const j = await r.json();
       setSummary(j);
+      setEnrollmentWindowEnd(toLocalDateTime(j.enrollment_open_until));
     } catch (err: any) {
       setMsg(err?.message || String(err));
     }
@@ -161,10 +164,14 @@ export default function TenantAdminPortalPage() {
     }
     try {
       setTogglingEnrollment(true);
+      const payload: Record<string, any> = { open };
+      if (open && enrollmentWindowEnd) {
+        payload.expires_at = new Date(enrollmentWindowEnd).toISOString();
+      }
       const r = await fetch(`${API_BASE}/v1/tenant-admin/enrollment-window`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ open }),
+        body: JSON.stringify(payload),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
@@ -186,7 +193,16 @@ export default function TenantAdminPortalPage() {
     );
   }
 
-  const metrics = summary || { courses: 0, students: 0, enrollments: 0, reviews: 0, ai_portal_enabled: false, enrollment_open: false };
+  const metrics =
+    summary || {
+      courses: 0,
+      students: 0,
+      enrollments: 0,
+      reviews: 0,
+      ai_portal_enabled: false,
+      enrollment_open: false,
+      enrollment_open_until: null,
+    };
 
   return (
     <div className="space-y-6">
@@ -231,6 +247,18 @@ export default function TenantAdminPortalPage() {
               ? "수강신청 마감"
               : "수강신청 오픈"}
           </button>
+          <label className="text-xs text-white/60">활성화 종료</label>
+          <input
+            type="datetime-local"
+            value={enrollmentWindowEnd}
+            onChange={(event) => setEnrollmentWindowEnd(event.target.value)}
+            className="w-full rounded-full border border-white/20 bg-black/40 px-3 py-2 text-xs text-white/80 focus:border-indigo-400 focus:outline-none"
+          />
+          {metrics.enrollment_open_until && (
+            <div className="text-xs text-white/60">
+              현재 종료: {formatDeadline(metrics.enrollment_open_until)}
+            </div>
+          )}
           <div className="text-xs text-white/60">
             학생 포털에서 수강신청 가능 여부를 제어합니다.
           </div>

@@ -1,9 +1,11 @@
+import Link from "next/link";
 import React from "react";
 
 type Section = {
   title: string;
   description: string;
   actionLabel: string;
+  actionHref?: string;
 };
 
 type StatItem = {
@@ -74,12 +76,23 @@ export default function RoleDashboard({
               <p className="text-sm text-white/70">{section.description}</p>
             </div>
             <div className="pt-4">
-              <button
-                type="button"
-                className="rounded-full border border-white/20 bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
-              >
-                {section.actionLabel}
-              </button>
+            <div>
+              {section.actionHref ? (
+                <Link
+                  href={section.actionHref}
+                  className="rounded-full border border-white/20 bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
+                >
+                  {section.actionLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105"
+                >
+                  {section.actionLabel}
+                </button>
+              )}
+            </div>
             </div>
           </article>
         ))}

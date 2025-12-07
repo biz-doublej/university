@@ -14,6 +14,7 @@ export default function AdminDashboard({ university }: Props) {
       description:
         "과목 개설, 정원 조정, AI 시간표 배정까지 모든 학사 편성을 중앙에서 제어합니다.",
       actionLabel: "편성 열기",
+      actionHref: "/dashboard/admin/curriculum",
     },
     {
       title: "권한 및 사용자 관리",

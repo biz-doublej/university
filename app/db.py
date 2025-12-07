@@ -25,15 +25,15 @@ def _run_schema_upgrades() -> None:
     with _engine.begin() as conn:
         inspector = inspect(conn)
         # tenants.ai_portal_enabled
-    tenant_cols = {col["name"] for col in inspector.get_columns("tenants")}
-    if "ai_portal_enabled" not in tenant_cols:
-        conn.execute(text("ALTER TABLE tenants ADD COLUMN ai_portal_enabled BOOLEAN DEFAULT 0"))
-        tenant_cols.add("ai_portal_enabled")
-    if "enrollment_open_until" not in tenant_cols:
-        conn.execute(text("ALTER TABLE tenants ADD COLUMN enrollment_open_until TIMESTAMP NULL"))
-        tenant_cols.add("enrollment_open_until")
-    # api_keys.key_type
-    api_key_cols = {col["name"] for col in inspector.get_columns("api_keys")}
+        tenant_cols = {col["name"] for col in inspector.get_columns("tenants")}
+        if "ai_portal_enabled" not in tenant_cols:
+            conn.execute(text("ALTER TABLE tenants ADD COLUMN ai_portal_enabled BOOLEAN DEFAULT 0"))
+            tenant_cols.add("ai_portal_enabled")
+        if "enrollment_open_until" not in tenant_cols:
+            conn.execute(text("ALTER TABLE tenants ADD COLUMN enrollment_open_until TIMESTAMP NULL"))
+            tenant_cols.add("enrollment_open_until")
+        # api_keys.key_type
+        api_key_cols = {col["name"] for col in inspector.get_columns("api_keys")}
         if "key_type" not in api_key_cols:
             conn.execute(text("ALTER TABLE api_keys ADD COLUMN key_type VARCHAR(16) DEFAULT 'api'"))
             conn.execute(text("UPDATE api_keys SET key_type = 'api' WHERE key_type IS NULL"))
@@ -51,12 +51,11 @@ def _run_schema_upgrades() -> None:
             conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
         if "university_name" not in user_cols:
             conn.execute(text("ALTER TABLE users ADD COLUMN university_name VARCHAR(255)"))
-    if "department_name" not in user_cols:
-        conn.execute(text("ALTER TABLE users ADD COLUMN department_name VARCHAR(255)"))
-
-    course_cols = {col["name"] for col in inspector.get_columns("courses")}
-    if "department" not in course_cols:
-        conn.execute(text("ALTER TABLE courses ADD COLUMN department VARCHAR(100)"))
+        if "department_name" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN department_name VARCHAR(255)"))
+        course_cols = {col["name"] for col in inspector.get_columns("courses")}
+        if "department" not in course_cols:
+            conn.execute(text("ALTER TABLE courses ADD COLUMN department VARCHAR(100)"))
 
 
 def init_db() -> None:

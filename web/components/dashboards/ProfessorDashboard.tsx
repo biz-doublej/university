@@ -14,24 +14,28 @@ export default function ProfessorDashboard({ university }: Props) {
       description:
         "현재 개설된 강의, 정원 현황, 수강신청 추이를 실시간으로 모니터링합니다.",
       actionLabel: "강의 보기",
+      actionHref: "/dashboard/professor/enrollments",
     },
     {
       title: "일정 자동 조정",
       description:
         "AI는 교수 일정, 학과 캘린더, 실습실 여유를 고려하여 최적의 강의 시간을 추천합니다.",
       actionLabel: "추천 일정 보기",
+      actionHref: "/dashboard/professor/schedule",
     },
     {
       title: "학생 피드백 분석",
       description:
         "수업 만족도와 질의 응답 통계를 시각화해 교육 개선 포인트를 제시합니다.",
       actionLabel: "피드백 확인",
+      actionHref: "/dashboard/professor/feedback",
     },
     {
       title: "과제·평가 관리",
       description:
         "과제, 루브릭, 성적 마감일을 공유하고 자동 리마인더를 설정해 둡니다.",
       actionLabel: "평가 계획",
+      actionHref: "/dashboard/professor/assessments",
     },
   ];
 

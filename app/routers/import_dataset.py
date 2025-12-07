@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
+import tempfile
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
 from sqlalchemy import select
 
 from ..db import get_db
-from ..models import Tenant, Room, Course, Timeslot
+from ..models import Tenant, Room, Course, Timeslot, DataUpload
 from ..services.auth import resolve_tenant_from_headers
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -90,29 +92,85 @@ def _header_map(headers: List[str]) -> Dict[str, str]:
     return mapping
 
 
+def _dict_to_str_row(row: dict) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for key, value in row.items():
+        if value is None:
+            out[str(key)] = ""
+        else:
+            out[str(key)] = str(value)
+    return out
+
+
 def _read_rows(file_path: str) -> List[Dict[str, str]]:
-    if file_path.lower().endswith(".csv"):
+    lower = file_path.lower()
+    if lower.endswith(".json"):
+        with open(file_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        items: List[Dict[str, str]] = []
+        if isinstance(raw, dict):
+            raw = [raw]
+        for entry in raw:
+            if isinstance(entry, dict):
+                items.append(_dict_to_str_row(entry))
+        return items
+    if lower.endswith(".csv"):
         with open(file_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             return [dict(r) for r in reader]
-    else:
+    try:
+        import openpyxl  # type: ignore
+    except Exception as e:  # pragma: no cover
+        raise RuntimeError("openpyxl is required to read Excel files. pip install openpyxl") from e
+    wb = openpyxl.load_workbook(file_path, read_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return []
+    headers = [str(v or "").strip() for v in rows[0]]
+    out: List[Dict[str, str]] = []
+    for r in rows[1:]:
+        row: Dict[str, str] = {}
+        for i, h in enumerate(headers):
+            row[h] = str(r[i] if i < len(r) and r[i] is not None else "")
+        out.append(row)
+    return out
+
+
+def _read_rows_from_bytes(filename: str, data: bytes) -> List[Dict[str, str]]:
+    suffix = os.path.splitext(filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        tmp_path = tmp.name
+    try:
+        return _read_rows(tmp_path)
+    finally:
         try:
-            import openpyxl  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError("openpyxl is required to read Excel files. pip install openpyxl") from e
-        wb = openpyxl.load_workbook(file_path, read_only=True)
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if not rows:
-            return []
-        headers = [str(v or "").strip() for v in rows[0]]
-        out: List[Dict[str, str]] = []
-        for r in rows[1:]:
-            row: Dict[str, str] = {}
-            for i, h in enumerate(headers):
-                row[h] = str(r[i] if i < len(r) and r[i] is not None else "")
-            out.append(row)
-        return out
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
+def _record_data_upload(
+    db,
+    tenant: Tenant,
+    filename: str,
+    file_type: Optional[str],
+    rows: int,
+    summary: dict[str, int],
+) -> DataUpload:
+    record = DataUpload(
+        tenant_id=tenant.id,
+        filename=filename,
+        file_type=file_type,
+        rows=rows,
+        summary=summary,
+        active=False,
+    )
+    db.add(record)
+    db.flush()
+    return record
 
 
 def _get_or_create_tenant(db, tenant_header: Optional[str]) -> Tenant:
@@ -131,29 +189,7 @@ def _get_or_create_tenant(db, tenant_header: Optional[str]) -> Tenant:
     return db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
 
 
-@router.post("/dataset")
-def import_dataset(
-    file: Optional[str] = Query(default=None, description="Specific file name in data/ to import"),
-    tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
-    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
-    authorization: str | None = Header(default=None, alias="Authorization"),
-    db=Depends(get_db),
-):
-    path = _find_data_file(file)
-    if not path:
-        return {"imported": False, "reason": "no data file"}
-    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
-    if tenant is None:
-        return {"imported": False, "reason": "no tenant"}
-
-    rows = _read_rows(path)
-    if not rows:
-        return {"imported": False, "reason": "empty file"}
-
-    map_ = _header_map(list(rows[0].keys()))
-    created = {"rooms": 0, "courses": 0, "timeslots": 0}
-
-    # Create timeslots grid if absent (Mon-Fri 09-18 hourly)
+def _ensure_timeslots(db, tenant: Tenant) -> int:
     if db.execute(select(Timeslot).where(Timeslot.tenant_id == tenant.id)).first() is None:
         days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
         for d in days:
@@ -161,9 +197,16 @@ def import_dataset(
                 start = f"{h:02d}:00"
                 end = f"{h+1:02d}:00"
                 db.add(Timeslot(tenant_id=tenant.id, day=d, start=start, end=end, granularity=60))
-        created["timeslots"] = 9 * 5
+        return 9 * 5
+    return 0
 
-    # Index existing
+
+def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, int]:
+    created = {"rooms": 0, "courses": 0, "timeslots": 0}
+    created["timeslots"] = _ensure_timeslots(db, tenant)
+
+    map_ = _header_map(list(rows[0].keys()))
+
     existing_rooms = {(r.name, r.building): r for r in db.query(Room).filter(Room.tenant_id == tenant.id).all()}
     existing_courses = {c.code: c for c in db.query(Course).filter(Course.tenant_id == tenant.id).all()}
 
@@ -178,7 +221,6 @@ def import_dataset(
         needs_lab_flag = True if ("실습" in class_type) else False
         department = get("department")
 
-        # Room upsert
         room_key = (room_name, building)
         if room_key not in existing_rooms and room_name:
             room = Room(
@@ -193,11 +235,10 @@ def import_dataset(
             existing_rooms[room_key] = room
             created["rooms"] += 1
 
-        # Course upsert
         code = get("course_code") or get("course_name")
         name = get("course_name") or code
         if code and code not in existing_courses:
-            hours_pw_str = get("weeks")  # fallback placeholder
+            hours_pw_str = get("weeks")
             hours_pw = 3
             try:
                 hv = int(hours_pw_str)
@@ -228,5 +269,54 @@ def import_dataset(
             existing.department = department
             db.add(existing)
 
+    return created
+
+
+@router.post("/dataset")
+def import_dataset(
+    file: Optional[str] = Query(default=None, description="Specific file name in data/ to import"),
+    tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db=Depends(get_db),
+):
+    path = _find_data_file(file)
+    if not path:
+        return {"imported": False, "reason": "no data file"}
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
+    if tenant is None:
+        return {"imported": False, "reason": "no tenant"}
+
+    rows = _read_rows(path)
+    if not rows:
+        return {"imported": False, "reason": "empty file"}
+
+    created = _process_rows(db, tenant, rows)
+    filename = os.path.basename(path)
+    file_type = os.path.splitext(filename)[1].lstrip(".").lower() or None
+    _record_data_upload(db, tenant, filename, file_type, len(rows), created)
     db.commit()
     return {"imported": True, "file": os.path.basename(path), "created": created}
+
+
+@router.post("/dataset/upload")
+def upload_dataset(
+    file: UploadFile = File(...),
+    tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db=Depends(get_db),
+) -> dict:
+    contents = file.file.read()
+    rows = _read_rows_from_bytes(file.filename or "upload", contents)
+    if not rows:
+        return {"imported": False, "reason": "empty file"}
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
+    if tenant is None:
+        return {"imported": False, "reason": "no tenant"}
+    created = _process_rows(db, tenant, rows)
+    filename = file.filename or "upload"
+    file_type = os.path.splitext(filename)[1].lstrip(".").lower() or None
+    record = _record_data_upload(db, tenant, filename, file_type, len(rows), created)
+    db.commit()
+    return {"imported": True, "file": filename, "created": created, "dataset_id": record.id}

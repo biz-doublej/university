@@ -12,6 +12,17 @@ type Summary = {
   enrollment_open_until?: string | null;
 };
 
+type DatasetRecord = {
+  id: number;
+  filename: string;
+  file_type?: string | null;
+  rows: number;
+  summary: Record<string, number>;
+  active: boolean;
+  uploaded_at: string;
+  activated_at: string | null;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 const SAMPLE_PAYLOAD = JSON.stringify(
@@ -62,6 +73,57 @@ export default function TenantAdminPortalPage() {
   const [aiKey, setAiKey] = useState<string | null>(null);
   const [togglingEnrollment, setTogglingEnrollment] = useState<boolean>(false);
   const [enrollmentWindowEnd, setEnrollmentWindowEnd] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileUploadMsg, setFileUploadMsg] = useState<string>("");
+  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
+  const [loadingDatasets, setLoadingDatasets] = useState(false);
+  const [activatingDatasetId, setActivatingDatasetId] = useState<number | null>(null);
+
+  const loadSummary = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/v1/tenant-admin/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem("tma_token");
+          setToken(null);
+          setMsg("세션이 만료되었습니다. 다시 로그인하세요.");
+        }
+        return;
+      }
+      const data = await res.json();
+      setSummary(data);
+      setEnrollmentWindowEnd(toLocalDateTime(data.enrollment_open_until));
+    } catch (error: any) {
+      setMsg(error?.message || String(error));
+    }
+  };
+
+  const loadDatasets = async () => {
+    if (!token) {
+      setDatasets([]);
+      return;
+    }
+    setLoadingDatasets(true);
+    try {
+      const res = await fetch(`${API_BASE}/v1/tenant-admin/datasets`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.error || `HTTP ${res.status}`);
+      }
+      setDatasets(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      setFileUploadMsg(error?.message || "업로드된 데이터 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoadingDatasets(false);
+    }
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem("tma_token");
@@ -69,41 +131,13 @@ export default function TenantAdminPortalPage() {
   }, []);
 
   useEffect(() => {
-    const load = async () => {
-      if (!token) {
-        setSummary(null);
-        return;
-      }
-      try {
-        const r = await fetch(`${API_BASE}/v1/tenant-admin/summary`, { headers: { Authorization: `Bearer ${token}` } });
-        if (r.status === 401) {
-          localStorage.removeItem("tma_token");
-          setToken(null);
-          setMsg("세션이 만료되었습니다. 다시 로그인하세요.");
-          return;
-        }
-        const j = await r.json();
-        setSummary(j);
-        setEnrollmentWindowEnd(toLocalDateTime(j.enrollment_open_until));
-      } catch (err: any) {
-        setMsg(err?.message || String(err));
-      }
-    };
-    void load();
-  }, [token]);
-
-  const loadSummary = async () => {
-    if (!token) return;
-    try {
-      const r = await fetch(`${API_BASE}/v1/tenant-admin/summary`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!r.ok) return;
-      const j = await r.json();
-      setSummary(j);
-      setEnrollmentWindowEnd(toLocalDateTime(j.enrollment_open_until));
-    } catch (err: any) {
-      setMsg(err?.message || String(err));
+    if (!token) {
+      setSummary(null);
+      setDatasets([]);
+      return;
     }
-  };
+    void Promise.all([loadSummary(), loadDatasets()]);
+  }, [token]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,10 +160,80 @@ export default function TenantAdminPortalPage() {
       if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
       setMsg(`업로드 완료: ${JSON.stringify(j)}`);
       await loadSummary();
+      await loadDatasets();
     } catch (err: any) {
       setMsg(`업로드 실패: ${err?.message || err}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadDataFile = async () => {
+    if (!token) {
+      setFileUploadMsg("먼저 로그인하세요.");
+      return;
+    }
+    if (!selectedFile) {
+      setFileUploadMsg("업로드할 파일을 선택하세요.");
+      return;
+    }
+    setUploadingFile(true);
+    setFileUploadMsg("");
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      const res = await fetch(`${API_BASE}/v1/import/dataset/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.reason || `HTTP ${res.status}`);
+      }
+      setFileUploadMsg(`파일 업로드 완료: ${data.file}`);
+      setSelectedFile(null);
+      setFileInputKey((prev) => prev + 1);
+      await loadSummary();
+    } catch (err: any) {
+      setFileUploadMsg(err?.message || "파일 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const activateDataset = async (datasetId: number) => {
+    if (!token) {
+      setFileUploadMsg("먼저 로그인하세요.");
+      return;
+    }
+    setActivatingDatasetId(datasetId);
+    setFileUploadMsg("");
+    try {
+      const payload = {
+        active_until: enrollmentWindowEnd ? new Date(enrollmentWindowEnd).toISOString() : null,
+      };
+      const res = await fetch(`${API_BASE}/v1/tenant-admin/datasets/${datasetId}/activate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.error || `HTTP ${res.status}`);
+      }
+      setFileUploadMsg(`${data.filename}의 수강신청을 활성화했습니다.`);
+      await loadSummary();
+      await loadDatasets();
+    } catch (err: any) {
+      setFileUploadMsg(err?.message || "수강신청 활성화 중 오류가 발생했습니다.");
+    } finally {
+      setActivatingDatasetId(null);
     }
   };
 
@@ -187,7 +291,7 @@ export default function TenantAdminPortalPage() {
   if (!token) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">대학 관리자 포털 (베타)</h1>
+        <h1 className="text-2xl font-semibold">대학 운영 포털</h1>
         <p className="text-white/70">이 페이지는 테넌트 관리자 권한이 있는 계정만 접근할 수 있습니다.</p>
       </div>
     );
@@ -207,8 +311,10 @@ export default function TenantAdminPortalPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">대학 관리자 포털 (베타)</h1>
-        <p className="text-white/70">학사 데이터를 업로드하고 학생/교원 포털에서 활용되는 AI 서비스를 제어합니다.</p>
+        <h1 className="text-2xl font-semibold">대학 운영 포털</h1>
+        <p className="text-white/70">
+          학사 데이터를 업로드하고 학생/교원 포털에서 활용되는 AI 서비스를 실시간으로 조율합니다.
+        </p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -296,8 +402,110 @@ export default function TenantAdminPortalPage() {
           />
           <div className="text-xs text-white/60">courses/students/enrollments/reviews 배열을 포함한 JSON을 입력하세요.</div>
         </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">파일 업로드 (JSON · Excel · CSV)</label>
+          <div className="flex flex-wrap gap-3">
+            <input
+              key={fileInputKey}
+              type="file"
+              accept=".json,.csv,.xls,.xlsx"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+              className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              className="btn px-4 py-2 text-sm"
+              onClick={uploadDataFile}
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? "파일 업로드 중..." : "파일로 가져오기"}
+            </button>
+          </div>
+          <div className="text-xs text-white/60">
+            선택된 파일: {selectedFile?.name || "없음"} · JSON/CSV/XLSX 자동 파싱
+          </div>
+          {fileUploadMsg && <div className="text-xs text-white/70">{fileUploadMsg}</div>}
+        </div>
         <button className="btn" type="submit" disabled={loading}>{loading ? "업로드 중…" : "데이터 업로드"}</button>
       </form>
+
+      <section className="rounded-3xl border border-white/10 bg-black/30 p-6 shadow-lg backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-white">업로드된 학사 데이터</h2>
+            <p className="mt-1 text-sm text-white/60">
+              업로드한 파일을 확인하고 특정 데이터를 수강신청 활성화 대상으로 선택할 수 있습니다.
+            </p>
+          </div>
+          {loadingDatasets && (
+            <div className="text-sm text-white/60">데이터 목록을 불러오는 중...</div>
+          )}
+        </div>
+        {datasets.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-white/30 px-4 py-6 text-sm text-white/60">
+            아직 파일 업로드 이력이 없습니다. 위에서 XLSX/CSV/JSON 파일을 업로드해 주세요.
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {datasets.map((dataset) => {
+              const summaryEntries = (dataset.summary || {}) as Record<string, number>;
+              return (
+                <article
+                  key={dataset.id}
+                  className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-base font-semibold text-white">{dataset.filename}</div>
+                      <div className="text-xs text-white/50">
+                        업로드 {formatDeadline(dataset.uploaded_at)} · {dataset.rows}개 행 · {dataset.file_type || "확인불가"}
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        dataset.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white/60"
+                      }`}
+                    >
+                      {dataset.active ? "활성화" : "대기"}
+                    </span>
+                  </div>
+                  {Object.keys(summaryEntries).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(summaryEntries).map(([name, count]) => (
+                        <span key={name} className="rounded-full bg-white/10 px-2 py-1 text-xs">
+                          {name} {count}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {dataset.activated_at && (
+                    <div className="text-xs text-white/60">
+                      마지막 활성화 {formatDeadline(dataset.activated_at)}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className="btn rounded-full px-4 py-2 text-xs"
+                      onClick={() => activateDataset(dataset.id)}
+                      disabled={activatingDatasetId === dataset.id}
+                    >
+                      {activatingDatasetId === dataset.id
+                        ? "활성화 중..."
+                        : dataset.active
+                        ? "현재 활성화됨"
+                        : "수강신청 활성화"}
+                    </button>
+                    <div className="text-xs text-white/60">
+                      {dataset.file_type ? dataset.file_type.toUpperCase() : "유형 없음"}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {msg && <div className="text-sm text-white/70">{msg}</div>}
     </div>

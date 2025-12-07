@@ -13,6 +13,7 @@ from ..models import (
     Course,
     CourseReview,
     CurriculumActivation,
+    DataUpload,
     Enrollment,
     Student,
     Tenant,
@@ -300,3 +301,62 @@ def set_enrollment_window(
         if tenant.enrollment_open_until
         else None,
     }
+
+
+class ActivateDatasetReq(BaseModel):
+    active_until: Optional[datetime] = None
+
+
+def _serialize_dataset(record: DataUpload) -> dict[str, Any]:
+    return {
+        "id": record.id,
+        "filename": record.filename,
+        "file_type": record.file_type,
+        "rows": record.rows,
+        "summary": record.summary or {},
+        "active": bool(record.active),
+        "uploaded_at": record.uploaded_at.isoformat(),
+        "activated_at": record.activated_at.isoformat() if record.activated_at else None,
+    }
+
+
+@router.get("/datasets")
+def list_datasets(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> List[dict[str, Any]]:
+    user = _require_admin_user(db, authorization)
+    entries = (
+        db.query(DataUpload)
+        .filter(DataUpload.tenant_id == user.tenant_id)
+        .order_by(DataUpload.uploaded_at.desc())
+        .all()
+    )
+    return [_serialize_dataset(entry) for entry in entries]
+
+
+@router.post("/datasets/{dataset_id}/activate")
+def activate_dataset(
+    dataset_id: int,
+    payload: ActivateDatasetReq,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    dataset = db.get(DataUpload, dataset_id)
+    if dataset is None or dataset.tenant_id != tenant.id:
+        raise HTTPException(status_code=404, detail="dataset_not_found")
+    db.query(DataUpload).filter(DataUpload.tenant_id == tenant.id).update(
+        {DataUpload.active: False}, synchronize_session=False
+    )
+    dataset.active = True
+    dataset.activated_at = datetime.utcnow()
+    tenant.enrollment_open = True
+    tenant.enrollment_open_until = payload.active_until
+    db.add(tenant)
+    db.add(dataset)
+    db.commit()
+    return _serialize_dataset(dataset)

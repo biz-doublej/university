@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 from typing import Dict, List, Optional
+import re
 
 from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
 from sqlalchemy import select
@@ -90,6 +91,19 @@ def _header_map(headers: List[str]) -> Dict[str, str]:
                 break
         mapping[h] = mapped or norm
     return mapping
+
+
+def _normalize_cohort(raw: str | None) -> Optional[str]:
+    """Convert patterns like '1A0' → '1-A', '2B' → '2-B'."""
+    if not raw:
+        return None
+    token = raw.strip()
+    if not token:
+        return None
+    m = re.match(r"^(\d)([A-Za-z가-힣])", token)
+    if m:
+        return f"{m.group(1)}-{m.group(2).upper()}"
+    return token
 
 
 def _dict_to_str_row(row: dict) -> Dict[str, str]:
@@ -201,6 +215,18 @@ def _ensure_timeslots(db, tenant: Tenant) -> int:
     return 0
 
 
+def _normalize_building(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    txt = raw.strip()
+    if not txt:
+        return None
+    # 통합: "남양주-창조관", "창조관" 등은 모두 "창조관"으로 정규화
+    if "창조관" in txt:
+        return "창조관"
+    return txt
+
+
 def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, int]:
     created = {"rooms": 0, "courses": 0, "timeslots": 0}
     created["timeslots"] = _ensure_timeslots(db, tenant)
@@ -212,7 +238,7 @@ def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, i
 
     for r in rows:
         get = lambda k: r.get(next((h for h, m in map_.items() if m == k), ""), "").strip()
-        building = get("building")
+        building = _normalize_building(get("building"))
         room_no = get("room_no")
         room_name = get("room_name") or room_no
         capacity_str = get("limit")
@@ -220,6 +246,12 @@ def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, i
         class_type = get("class_type")
         needs_lab_flag = True if ("실습" in class_type) else False
         department = get("department")
+        # 빅데이터과: 건물 미지정 시 창조관으로 지정
+        if (department or "").strip() == "빅데이터과" and not building:
+            building = "창조관"
+        # room_name 없고 room_no 있으면 이름으로 사용
+        if not room_name and room_no:
+            room_name = room_no
 
         room_key = (room_name, building)
         if room_key not in existing_rooms and room_name:
@@ -237,6 +269,7 @@ def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, i
 
         code = get("course_code") or get("course_name")
         name = get("course_name") or code
+        cohort = _normalize_cohort(get("section") or get("grade") or None)
         if code and code not in existing_courses:
             hours_pw_str = get("weeks")
             hours_pw = 3
@@ -259,14 +292,18 @@ def _process_rows(db, tenant: Tenant, rows: List[Dict[str, str]]) -> dict[str, i
                 department=department,
                 needs_lab=needs_lab_flag,
                 expected_enrollment=expected,
+                cohort=cohort,
             )
             db.add(c)
             db.flush()
             existing_courses[code] = c
             created["courses"] += 1
-        elif code and code in existing_courses and department:
+        elif code and code in existing_courses:
             existing = existing_courses[code]
-            existing.department = department
+            if department:
+                existing.department = department
+            if cohort:
+                existing.cohort = cohort
             db.add(existing)
 
     return created

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Dict, Tuple
+import random
 
 from sqlalchemy.orm import Session
 
@@ -68,11 +69,13 @@ def warm_start_greedy(
 ) -> tuple[list[AssignmentLite], dict]:
     courses, rooms, slots = _load_lite(db, tenant_id)
     slot_lookup = {s.id: s for s in slots}
+    rng = random.Random(tenant_id)
     # Sort courses: larger enrollment first, and lab first
     courses.sort(key=lambda c: (not c.needs_lab, -c.expected_enrollment))
 
     # Generate grouped slot blocks
     slot_blocks = group_slots(slots, group_size)
+    rng.shuffle(slot_blocks)
     if not slots or not slot_blocks:
         stats = {
             "total_courses": len(courses),
@@ -84,6 +87,7 @@ def warm_start_greedy(
 
     # Track availability
     room_day_block_used: Dict[Tuple[int, Tuple[int, ...]], bool] = {}
+    room_slot_used: Dict[int, set[int]] = {}
     course_assigned: Dict[int, bool] = {}
     out: list[AssignmentLite] = []
 
@@ -92,12 +96,21 @@ def warm_start_greedy(
         hours_required = max(1, course.hours_per_week)
         blocks_needed = max(1, (hours_required + group_size - 1) // group_size)
         allowed_rooms = filter_rooms_for_course(course, rooms) if use_forbidden else rooms
-        # Prefer rooms: lab first, then tight capacity fit
+        # Department-specific constraint: 빅데이터과는 창조관만 사용
+        if course.department and course.department.strip() == "빅데이터과":
+            allowed_rooms = [
+                r for r in allowed_rooms if "창조관" in (r.building or "").strip()
+            ]
+            # If none, relax to 모든 창조관 강의실(초기 시드 포함)
+            if not allowed_rooms:
+                allowed_rooms = [r for r in rooms if "창조관" in (r.building or "").strip()]
+        # Prefer rooms: lab first, then tight capacity fit, random tie-breaker for 다양성
         allowed_rooms = sorted(
             allowed_rooms,
             key=lambda r: (
                 r.type != ("lab" if course.needs_lab else r.type),
                 r.capacity,
+                rng.random(),
             ),
         )
 
@@ -112,6 +125,9 @@ def warm_start_greedy(
                 key = (room.id, tuple(block))
                 if room_day_block_used.get(key):
                     continue
+                # Prevent slot-level overlaps per room
+                if any(slot_id in room_slot_used.get(room.id, set()) for slot_id in block):
+                    continue
                 # Compute slack-based score (lower is better)
                 slack = max(0, room.capacity - course.expected_enrollment)
                 start_period = slot_lookup[block[0]].period if block and block[0] in slot_lookup else 0
@@ -122,7 +138,10 @@ def warm_start_greedy(
             if best_block:
                 out.append(AssignmentLite(course_id=course.id, room_id=room.id, slot_ids=list(best_block)))
                 room_day_block_used[(room.id, tuple(best_block))] = True
+                room_slot_used.setdefault(room.id, set()).update(best_block)
                 assigned_blocks += 1
+                if assigned_blocks >= blocks_needed:
+                    break
         course_assigned[course.id] = assigned_blocks > 0
 
     stats = {

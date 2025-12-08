@@ -15,7 +15,7 @@ class OptimizeRequest(BaseModel):
     policy_version: int
     week: str  # YYYY-WW
     solver: str | None = Field(default="greedy", description="greedy | pulp | ortools")
-    slot_group: int | None = Field(default=1, description="Group N consecutive slots as one block")
+    slot_group: int | None = Field(default=3, description="Group N consecutive slots as one block (default 3h 강의)")
     forbid_checks: bool | None = Field(default=True, description="Enable forbidden-set filtering")
 
 

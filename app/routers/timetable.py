@@ -43,6 +43,7 @@ def recommend_timetable(
 def rooms_timetable(
     week: str = Query(..., description="YYYY-WW"),
     tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    tenant_query: str | None = Query(default=None, alias="tenant"),
     x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
     authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_db),
@@ -52,7 +53,7 @@ def rooms_timetable(
     tenant = resolve_tenant_from_headers(
         db,
         api_key=(x_api_key or authorization or None),
-        tenant_key=tenant_key,
+        tenant_key=tenant_query or tenant_key,
     )
     q = db.query(Assignment, Course, Timeslot, Room)
     if tenant:

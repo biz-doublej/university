@@ -57,6 +57,10 @@ def submit_optimize_job(
 
                 if result is None:  # greedy fallback or explicit
                     assignments, stats = warm_start_greedy(db, tenant.id, group_size=slot_group, use_forbidden=forbid_checks)
+                    # If nothing assigned because of strict forbidden-set, retry ignoring forbidden to surface a plan
+                    if stats.get("assigned_courses", 0) == 0 and forbid_checks:
+                        assignments, stats = warm_start_greedy(db, tenant.id, group_size=slot_group, use_forbidden=False)
+                        used_solver = f"{used_solver}+relaxed"
                     persist_assignments(db, tenant.id, assignments)
                     score = _score_from_stats(stats)
                     elapsed = time.time() - started
@@ -95,9 +99,20 @@ def _ensure_seed_data(db: SessionLocal, tenant: Tenant) -> None:
     # Minimal safety net: create default rooms if none
     room_count = db.query(Room).filter(Room.tenant_id == tenant.id).count()
     if room_count == 0:
-        for i in range(1, 6):
-            db.add(Room(tenant_id=tenant.id, name=f"R{i:03d}", type="classroom", capacity=30, building="Demo"))
-        room_count = 5
+        # 창조관 빌딩을 기본으로 여러 강의실/실습실 생성
+        labs = [("창조관 Lab401", 32), ("창조관 Lab402", 28)]
+        classes = [
+            ("창조관 R101", 30),
+            ("창조관 R102", 40),
+            ("창조관 R201", 24),
+            ("창조관 R202", 36),
+            ("창조관 R301", 32),
+        ]
+        for name, cap in labs:
+            db.add(Room(tenant_id=tenant.id, name=name, type="lab", capacity=cap, building="창조관"))
+        for name, cap in classes:
+            db.add(Room(tenant_id=tenant.id, name=name, type="classroom", capacity=cap, building="창조관"))
+        room_count = len(labs) + len(classes)
 
     # Minimal safety net: create weekday hourly slots if none or invalid
     ts_rows = db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).all()
@@ -131,3 +146,12 @@ def _ensure_seed_data(db: SessionLocal, tenant: Tenant) -> None:
                 )
             )
     db.commit()
+
+
+def _has_valid_slots(slots: list[Timeslot]) -> bool:
+    from .scheduler.calendar_rules import normalize_slot
+
+    for s in slots:
+        if normalize_slot(s.day, s.start, s.end) is not None:
+            return True
+    return False

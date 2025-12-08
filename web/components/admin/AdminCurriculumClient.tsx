@@ -28,6 +28,23 @@ type Props = {
   university: string;
 };
 
+const DAYS = [
+  { value: "Mon", label: "월" },
+  { value: "Tue", label: "화" },
+  { value: "Wed", label: "수" },
+  { value: "Thu", label: "목" },
+  { value: "Fri", label: "금" },
+];
+
+const PALETTE = [
+  "rgba(125, 211, 252, 0.9)",
+  "rgba(167, 139, 250, 0.9)",
+  "rgba(74, 222, 128, 0.9)",
+  "rgba(251, 191, 36, 0.9)",
+  "rgba(248, 113, 113, 0.9)",
+  "rgba(96, 165, 250, 0.9)",
+];
+
 type TimetableRow = {
   room_id: number;
   room_name: string | null;
@@ -132,7 +149,7 @@ export default function AdminCurriculumClient({ university }: Props) {
   const loadTimetable = useCallback(async () => {
     setTtLoading(true);
     try {
-      const res = await fetch("/api/timetable/rooms?week=2025-01");
+      const res = await fetch(`/api/timetable/rooms?week=2025-01&tenant=${encodeURIComponent(university)}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.error || "배정 결과를 불러오지 못했습니다.");
@@ -275,6 +292,9 @@ export default function AdminCurriculumClient({ university }: Props) {
           </div>
         </div>
         {ttLoading && <div className="mt-3 text-sm text-white/60">배정 결과 불러오는 중...</div>}
+        <div className="mt-4">
+          <TimetableGrid rows={filtered} />
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full border-collapse text-sm text-white/80">
             <thead>
@@ -329,4 +349,104 @@ function MetricCard({ title, value }: { title: string; value: string }) {
       <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
     </div>
   );
+}
+
+function TimetableGrid({ rows }: { rows: TimetableRow[] }) {
+  const hours = Array.from({ length: 10 }, (_, i) => 9 + i); // 09~18
+
+  const byCourseColor = (course: string | null | undefined) => {
+    if (!course) return PALETTE[0];
+    const idx = Math.abs(hashCode(course)) % PALETTE.length;
+    return PALETTE[idx];
+  };
+
+  const blocks = rows.map((row) => {
+    const startHour = parseInt(row.start.split(":")[0], 10);
+    const endHour = parseInt(row.end.split(":")[0], 10);
+    const duration = Math.max(1, endHour - startHour);
+    const rowStart = startHour - 9 + 1; // grid row start (1-based)
+    const dayIndex = DAYS.findIndex((d) => d.value === row.day);
+    const colStart = dayIndex + 2; // first column is time labels
+    return {
+      ...row,
+      duration,
+      rowStart,
+      colStart,
+      color: byCourseColor(row.course_code || row.course_name),
+    };
+  });
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white">
+      <div
+        className="grid gap-px"
+        style={{
+          gridTemplateColumns: "80px repeat(5, 1fr)",
+          gridTemplateRows: "repeat(10, minmax(60px, auto))",
+        }}
+      >
+        {/* Time column */}
+        {hours.map((h, idx) => (
+          <div
+            key={`time-${h}`}
+            className="border border-white/10 px-2 py-2 text-sm text-white/60"
+            style={{ gridColumnStart: 1, gridRowStart: idx + 1 }}
+          >
+            {`${h.toString().padStart(2, "0")}:00`}
+          </div>
+        ))}
+
+        {/* Day headers */}
+        {DAYS.map((d, i) => (
+          <div
+            key={`day-header-${d.value}`}
+            className="border border-white/10 px-2 py-2 text-center text-sm font-semibold text-white/80"
+            style={{ gridColumnStart: i + 2, gridRowStart: 1 }}
+          >
+            {d.label}
+          </div>
+        ))}
+
+        {/* Empty cells for grid structure */}
+        {DAYS.map((d, i) =>
+          hours.map((h, idx) => (
+            <div
+              key={`cell-${d.value}-${h}`}
+              className="border border-white/5"
+              style={{ gridColumnStart: i + 2, gridRowStart: idx + 1 }}
+            />
+          )),
+        )}
+
+        {/* Blocks */}
+        {blocks.map((b, idx) => (
+          <div
+            key={`${b.course_code || b.course_name}-${idx}`}
+            className="overflow-hidden rounded-lg border border-white/20 p-2 text-xs shadow-md"
+            style={{
+              gridColumnStart: b.colStart,
+              gridRowStart: b.rowStart,
+              gridRowEnd: `span ${b.duration}`,
+              backgroundColor: b.color,
+            }}
+          >
+            <div className="font-semibold text-white">{b.course_name || b.course_code}</div>
+            <div className="text-white/80">
+              {b.course_code} · {b.department || "-"} · {b.cohort || "-"}
+            </div>
+            <div className="text-white/80">{b.room_name || "-"}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function hashCode(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
 }

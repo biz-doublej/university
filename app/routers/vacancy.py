@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Query, Depends, Header
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -82,6 +83,98 @@ def vacancy_heatmap(
         ratio = round(vacant / max(1, total_rooms), 4)
         cells.append(VacancyHeatmapCell(day=t.day, time=t.start, vacancy_ratio=ratio))
     return cells
+
+
+@router.get("/snapshot")
+def vacancy_snapshot(
+    week: str = Query(..., description="YYYY-WW (미사용 placeholder)"),
+    building: str | None = Query(default=None),
+    tenant_key: str | None = Header(default=None, convert_underscores=False, alias="X-Tenant-ID"),
+    x_api_key: str | None = Header(default=None, convert_underscores=False, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+):
+    """실시간 공실 스냅샷 + 히트맵 + 현재 시각 가동률을 함께 제공."""
+    tenant = resolve_tenant_from_headers(db, api_key=(x_api_key or authorization or None), tenant_key=tenant_key)
+    if tenant is None:
+        return {"heatmap": [], "note": "tenant_not_found"}
+
+    timeslots: list[Timeslot] = db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).all()
+    if not timeslots:
+        return {"heatmap": [], "note": "no_timeslots"}
+
+    room_q = db.query(Room).filter(Room.tenant_id == tenant.id)
+    if building:
+        room_q = room_q.filter(Room.building == building)
+    rooms = room_q.all()
+    total_rooms = len(rooms)
+    if total_rooms == 0:
+        return {"heatmap": [], "note": "no_rooms"}
+
+    ts_ids = [t.id for t in timeslots]
+    a_rows = (
+        db.query(Assignment.room_id, Assignment.timeslot_id)
+        .filter(Assignment.tenant_id == tenant.id, Assignment.timeslot_id.in_(ts_ids))
+        .all()
+    )
+    occ_by_ts: dict[int, set[int]] = {}
+    for room_id, ts_id in a_rows:
+        if room_id is None or ts_id is None:
+            continue
+        occ_by_ts.setdefault(ts_id, set()).add(room_id)
+
+    if building:
+        allowed_room_ids = {r.id for r in rooms}
+        for ts_id in list(occ_by_ts.keys()):
+            occ_by_ts[ts_id] = {rid for rid in occ_by_ts[ts_id] if rid in allowed_room_ids}
+
+    cells: list[VacancyHeatmapCell] = []
+    occupied_slots = 0
+    for t in sorted(timeslots, key=lambda x: (x.day, x.start)):
+        occupied = len(occ_by_ts.get(t.id, set()))
+        occupied_slots += occupied
+        vacant = max(0, total_rooms - occupied)
+        ratio = round(vacant / max(1, total_rooms), 4)
+        cells.append(VacancyHeatmapCell(day=t.day, time=t.start, vacancy_ratio=ratio))
+
+    total_slots = len(timeslots) * total_rooms
+    utilization_ratio = round(occupied_slots / max(1, total_slots), 4)
+
+    # Live utilization: 현재 요일/시간에 겹치는 슬롯만 계산
+    weekday_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    now = datetime.now()
+    today_code = weekday_names[now.weekday()]
+    now_hm = now.strftime("%H:%M")
+    live_slot_ids = [
+        t.id
+        for t in timeslots
+        if t.day == today_code and t.start <= now_hm < t.end
+    ]
+    live_occupied_ids: set[int] = set()
+    for ts_id in live_slot_ids:
+        live_occupied_ids |= occ_by_ts.get(ts_id, set())
+    live_occupied = len(live_occupied_ids)
+    live_util_ratio = round(live_occupied / max(1, total_rooms), 4)
+
+    return {
+        "last_refreshed": datetime.utcnow().isoformat() + "Z",
+        "building": building,
+        "total_rooms": total_rooms,
+        "total_timeslots": len(timeslots),
+        "occupancy": {
+            "occupied_slots": occupied_slots,
+            "vacant_slots": max(0, total_slots - occupied_slots),
+            "utilization_ratio": utilization_ratio,
+        },
+        "live": {
+            "day": today_code,
+            "time": now_hm,
+            "occupied_rooms": live_occupied,
+            "vacant_rooms": max(0, total_rooms - live_occupied),
+            "utilization_ratio": live_util_ratio,
+        },
+        "heatmap": cells,
+    }
 
 
 @router.get("/available")

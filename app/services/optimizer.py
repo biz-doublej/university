@@ -25,46 +25,50 @@ def submit_optimize_job(
     def _worker(job_id: str) -> None:
         queue.update(job_id, status="running")
         started = time.time()
-        # Use default tenant (first enabled) for MVP
-        with SessionLocal() as db:
-            if tenant_id is not None:
-                tenant = db.get(Tenant, tenant_id)
-            else:
-                tenant = db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
-            if tenant is None:
-                tenant = Tenant(name="demo", enabled=True, locale="ko", timezone="Asia/Seoul")
-                db.add(tenant)
-                db.commit()
-                db.refresh(tenant)
+        try:
+            # Use default tenant (first enabled) for MVP
+            with SessionLocal() as db:
+                if tenant_id is not None:
+                    tenant = db.get(Tenant, tenant_id)
+                else:
+                    tenant = db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
+                if tenant is None:
+                    tenant = Tenant(name="demo", enabled=True, locale="ko", timezone="Asia/Seoul")
+                    db.add(tenant)
+                    db.commit()
+                    db.refresh(tenant)
 
-            _ensure_seed_data(db, tenant)
+                _ensure_seed_data(db, tenant)
 
-            # Branch by solver
-            used_solver = solver
-            result = None
+                # Branch by solver
+                used_solver = solver
+                result = None
 
-            if solver == "pulp" and pulp_available():
-                result = solve_with_pulp()
-                # If not implemented, fall back
-                if result is None:
-                    used_solver = "greedy"
+                if solver == "pulp" and pulp_available():
+                    result = solve_with_pulp()
+                    # If not implemented, fall back
+                    if result is None:
+                        used_solver = "greedy"
 
-            if solver == "ortools" and ort_available():
-                result = solve_with_ortools()
-                if result is None:
-                    used_solver = "greedy"
+                if solver == "ortools" and ort_available():
+                    result = solve_with_ortools()
+                    if result is None:
+                        used_solver = "greedy"
 
-            if result is None:  # greedy fallback or explicit
-                assignments, stats = warm_start_greedy(db, tenant.id, group_size=slot_group, use_forbidden=forbid_checks)
-                persist_assignments(db, tenant.id, assignments)
-                score = _score_from_stats(stats)
-                elapsed = time.time() - started
-                explain = (
-                    f"{used_solver} scheduled {stats['assigned_courses']}/{stats['total_courses']} courses "
-                    f"into {stats['assignment_count']} blocks in {elapsed:.2f}s (policy v{policy_version}, week {week})."
-                )
-                queue.update(job_id, status="completed", score=score, explain=explain)
-                return
+                if result is None:  # greedy fallback or explicit
+                    assignments, stats = warm_start_greedy(db, tenant.id, group_size=slot_group, use_forbidden=forbid_checks)
+                    persist_assignments(db, tenant.id, assignments)
+                    score = _score_from_stats(stats)
+                    elapsed = time.time() - started
+                    explain = (
+                        f"{used_solver} scheduled {stats['assigned_courses']}/{stats['total_courses']} courses "
+                        f"into {stats['assignment_count']} blocks in {elapsed:.2f}s (policy v{policy_version}, week {week})."
+                    )
+                    queue.update(job_id, status="completed", score=score, explain=explain)
+                    return
+        except Exception as exc:
+            queue.update(job_id, status="failed", explain=f"{type(exc).__name__}: {exc}")
+            return
 
     job = queue.create(_worker)
     return job.id
@@ -95,9 +99,10 @@ def _ensure_seed_data(db: SessionLocal, tenant: Tenant) -> None:
             db.add(Room(tenant_id=tenant.id, name=f"R{i:03d}", type="classroom", capacity=30, building="Demo"))
         room_count = 5
 
-    # Minimal safety net: create weekday hourly slots if none
-    ts_count = db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).count()
-    if ts_count == 0:
+    # Minimal safety net: create weekday hourly slots if none or invalid
+    ts_rows = db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).all()
+    if not _has_valid_slots(ts_rows):
+        db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).delete()
         days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
         for d in days:
             for h in range(9, 18):

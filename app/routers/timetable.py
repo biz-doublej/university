@@ -69,6 +69,9 @@ def rooms_timetable(
                 start=timeslot.start,
                 end=timeslot.end,
                 course_code=course.code,
+                course_name=course.name,
+                department=course.department,
+                cohort=course.cohort,
             )
         )
     return items

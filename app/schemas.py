@@ -40,6 +40,9 @@ class TimetableRoomItem(BaseModel):
     start: str
     end: str
     course_code: Optional[str] = None
+    course_name: Optional[str] = None
+    department: Optional[str] = None
+    cohort: Optional[str] = None
 
 
 class VacancyHeatmapCell(BaseModel):

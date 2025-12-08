@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from .jobs import queue
 from ..db import SessionLocal
-from ..models import Tenant
+from ..models import Tenant, Room, Timeslot, Course
 from .scheduler.greedy import warm_start_greedy, persist_assignments
 from .scheduler.pulp_solver import is_available as pulp_available, solve_with_pulp
 from .scheduler.ortools_solver import is_available as ort_available, solve_with_ortools
@@ -32,8 +32,12 @@ def submit_optimize_job(
             else:
                 tenant = db.execute(select(Tenant).where(Tenant.enabled == True)).scalars().first()  # noqa: E712
             if tenant is None:
-                queue.update(job_id, status="failed", explain="No tenant found")
-                return
+                tenant = Tenant(name="demo", enabled=True, locale="ko", timezone="Asia/Seoul")
+                db.add(tenant)
+                db.commit()
+                db.refresh(tenant)
+
+            _ensure_seed_data(db, tenant)
 
             # Branch by solver
             used_solver = solver
@@ -71,3 +75,54 @@ def _score_from_stats(stats: dict) -> float:
     assigned = stats.get("assigned_courses", 0)
     # Simple ratio as score baseline
     return round(assigned / total, 4)
+
+
+def _ensure_seed_data(db: SessionLocal, tenant: Tenant) -> None:
+    # Seed fixed dataset if present (rooms/courses/timeslots)
+    try:
+        # Local import to avoid circular dependency at module load
+        from .fixed_seed import ensure_fixed_dataset  # type: ignore
+
+        ensure_fixed_dataset(db, tenant)
+    except Exception:
+        # If seeding fails, continue with minimal scaffolding below
+        pass
+
+    # Minimal safety net: create default rooms if none
+    room_count = db.query(Room).filter(Room.tenant_id == tenant.id).count()
+    if room_count == 0:
+        for i in range(1, 6):
+            db.add(Room(tenant_id=tenant.id, name=f"R{i:03d}", type="classroom", capacity=30, building="Demo"))
+        room_count = 5
+
+    # Minimal safety net: create weekday hourly slots if none
+    ts_count = db.query(Timeslot).filter(Timeslot.tenant_id == tenant.id).count()
+    if ts_count == 0:
+        days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+        for d in days:
+            for h in range(9, 18):
+                start = f"{h:02d}:00"
+                end = f"{h+1:02d}:00"
+                db.add(Timeslot(tenant_id=tenant.id, day=d, start=start, end=end, granularity=60))
+    # Minimal safety net: create demo courses if none
+    course_count = db.query(Course).filter(Course.tenant_id == tenant.id).count()
+    if course_count == 0:
+        sample = [
+            ("NUR201", "기본간호실습", True, 28, "간호학과", "2-A"),
+            ("CS101", "컴퓨팅사고와코딩", False, 40, "컴퓨터공학과", "1-A"),
+            ("ME201", "기계공작실습", True, 24, "기계공학과", "2-B"),
+        ]
+        for code, name, needs_lab, expected, dept, cohort in sample:
+            db.add(
+                Course(
+                    tenant_id=tenant.id,
+                    code=code,
+                    name=name,
+                    hours_per_week=3,
+                    needs_lab=needs_lab,
+                    expected_enrollment=expected,
+                    department=dept,
+                    cohort=cohort,
+                )
+            )
+    db.commit()

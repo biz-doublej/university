@@ -28,6 +28,18 @@ type Props = {
   university: string;
 };
 
+type TimetableRow = {
+  room_id: number;
+  room_name: string | null;
+  day: string;
+  start: string;
+  end: string;
+  course_code: string | null;
+  course_name: string | null;
+  department: string | null;
+  cohort: string | null;
+};
+
 export default function AdminCurriculumClient({ university }: Props) {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -35,6 +47,9 @@ export default function AdminCurriculumClient({ university }: Props) {
   const [optimizing, setOptimizing] = useState(false);
   const [status, setStatus] = useState<OptimizeStatus | null>(null);
   const [fixedSummary, setFixedSummary] = useState<FixedSummary | null>(null);
+  const [timetable, setTimetable] = useState<TimetableRow[]>([]);
+  const [ttLoading, setTtLoading] = useState(false);
+  const [filters, setFilters] = useState({ department: "", cohort: "" });
 
   const loadSummary = useCallback(async () => {
     setLoadingSummary(true);
@@ -80,6 +95,7 @@ export default function AdminCurriculumClient({ university }: Props) {
     if (status.status === "completed" || status.status === "failed" || status.status === "not_found") {
       setOptimizing(false);
       void loadSummary();
+      void loadTimetable();
       return;
     }
     const timer = setInterval(async () => {
@@ -113,6 +129,68 @@ export default function AdminCurriculumClient({ university }: Props) {
     }
   };
 
+  const loadTimetable = useCallback(async () => {
+    setTtLoading(true);
+    try {
+      const res = await fetch("/api/timetable/rooms?week=2025-01");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "배정 결과를 불러오지 못했습니다.");
+      }
+      setTimetable(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setError(err?.message || "배정 결과를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setTtLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTimetable();
+  }, [loadTimetable]);
+
+  const filtered = timetable.filter((row) => {
+    const depOk = filters.department ? (row.department || "").includes(filters.department) : true;
+    const cohortOk = filters.cohort ? (row.cohort || "").includes(filters.cohort) : true;
+    return depOk && cohortOk;
+  });
+
+  const exportJson = () => {
+    const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "timetable.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = () => {
+    const header = ["day", "start", "end", "room_name", "course_code", "course_name", "department", "cohort"];
+    const lines = [header.join(",")];
+    filtered.forEach((r) => {
+      lines.push(
+        [
+          r.day,
+          r.start,
+          r.end,
+          r.room_name ?? "",
+          r.course_code ?? "",
+          r.course_name ?? "",
+          r.department ?? "",
+          r.cohort ?? "",
+        ].join(","),
+      );
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "timetable.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const scoreboard: Summary = summary ??
     {
       courses: fixedSummary?.courses ?? 0,
@@ -133,7 +211,7 @@ export default function AdminCurriculumClient({ university }: Props) {
         {loadingSummary && <div className="mt-3 text-sm text-white/60">요약 데이터를 불러오는 중...</div>}
         <div className="mt-4 grid gap-4 md:grid-cols-4">
           <MetricCard title="개설 과목" value={scoreboard.courses.toLocaleString()} />
-          <MetricCard title="등록 학생" value={scoreboard.students.toLocaleString()} />
+          <MetricCard title="데이터 크기" value={scoreboard.students.toLocaleString()} />
           <MetricCard title="수강신청" value={scoreboard.enrollments.toLocaleString()} />
           <MetricCard title="수업 후기" value={scoreboard.reviews.toLocaleString()} />
         </div>
@@ -157,6 +235,82 @@ export default function AdminCurriculumClient({ university }: Props) {
           </button>
         </div>
         {/* Optimization status panel intentionally suppressed for a cleaner UI */}
+      </section>
+
+      <section className="rounded-3xl border border-white/10 bg-black/30 p-6 shadow-lg backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-white">배정 결과</h2>
+            <p className="mt-1 text-sm text-white/60">학과·학년/반(코호트) 필터 후 JSON/CSV로 다운로드할 수 있습니다.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={filters.department}
+              onChange={(e) => setFilters((f) => ({ ...f, department: e.target.value }))}
+              placeholder="학과 입력 (예: 간호학과)"
+              className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none"
+            />
+            <input
+              type="text"
+              value={filters.cohort}
+              onChange={(e) => setFilters((f) => ({ ...f, cohort: e.target.value }))}
+              placeholder="학년/반 (예: 2-A)"
+              className="rounded-lg border border-white/20 bg-black/40 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={exportJson}
+              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:bg-white/10"
+            >
+              JSON 다운로드
+            </button>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:bg-white/10"
+            >
+              CSV 다운로드
+            </button>
+          </div>
+        </div>
+        {ttLoading && <div className="mt-3 text-sm text-white/60">배정 결과 불러오는 중...</div>}
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm text-white/80">
+            <thead>
+              <tr>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">요일</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">시간</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">강의실</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">과목코드</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">과목명</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">학과</th>
+                <th className="border border-white/10 px-3 py-2 text-left text-white/60">학년/반</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td className="border border-white/10 px-3 py-2 text-center text-white/60" colSpan={7}>
+                    배정 결과가 없습니다. 조건을 완화하거나 배정을 실행하세요.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((row, idx) => (
+                  <tr key={`${row.day}-${row.start}-${row.room_id}-${idx}`}>
+                    <td className="border border-white/10 px-3 py-2">{row.day}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.start} ~ {row.end}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.room_name ?? "-"}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.course_code ?? "-"}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.course_name ?? "-"}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.department ?? "-"}</td>
+                    <td className="border border-white/10 px-3 py-2">{row.cohort ?? "-"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {error && (

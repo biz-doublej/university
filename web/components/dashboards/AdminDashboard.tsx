@@ -67,7 +67,7 @@ export default function AdminDashboard({ university }: Props) {
     const base = summary || fixedSummary || { courses: 0, students: 0, enrollments: 0, reviews: 0 };
     return [
       { label: "개설 과목", value: base.courses.toLocaleString() },
-      { label: "등록 학생", value: base.students.toLocaleString() },
+      { label: "데이터 크기", value: base.students.toLocaleString() },
       { label: "수강신청", value: base.enrollments.toLocaleString() },
     ];
   }, [summary, fixedSummary]);
@@ -101,7 +101,7 @@ export default function AdminDashboard({ university }: Props) {
 
   const vizData = [
     { label: "개설 과목", value: summary?.courses ?? fixedSummary?.courses ?? 0 },
-    { label: "등록 학생", value: summary?.students ?? fixedSummary?.students ?? 0 },
+    { label: "데이터 크기", value: summary?.students ?? fixedSummary?.students ?? 0 },
     { label: "수강신청", value: summary?.enrollments ?? fixedSummary?.enrollments ?? 0 },
     { label: "수업 후기", value: summary?.reviews ?? fixedSummary?.reviews ?? 0 },
   ];

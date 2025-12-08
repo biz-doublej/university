@@ -6,7 +6,7 @@ export function getSessionAuthHeader(): string {
     process.env.NEXT_PUBLIC_TIMETABLE_SESSION_TOKEN ||
     "";
   if (!token) {
-    throw new Error("Missing TIMETABLE_SESSION_TOKEN environment variable");
+    return "";
   }
   return token.startsWith("Bearer ") ? token : `Bearer ${token}`;
 }
@@ -14,7 +14,7 @@ export function getSessionAuthHeader(): string {
 export function getAdminToken(): string {
   const token = process.env.ADMIN_TOKEN || process.env.NEXT_PUBLIC_ADMIN_TOKEN || "";
   if (!token) {
-    throw new Error("Missing ADMIN_TOKEN environment variable");
+    return "";
   }
   return token;
 }

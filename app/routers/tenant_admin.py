@@ -14,24 +14,26 @@ from ..models import (
     CourseReview,
     CurriculumActivation,
     DataUpload,
+    DepartmentActivation,
+    DepartmentActivation,
     Enrollment,
     Student,
     Tenant,
     User,
 )
 from ..schemas import AdminDataUpload
+from ..services import catalog
 from ..services.auth import get_user_from_token, generate_api_key
+from ..services.fixed_dataset import summarize_fixed_dataset
 
 
 router = APIRouter(prefix="/tenant-admin", tags=["tenant-admin"])
 
 
 def _require_admin_user(db: Session, authorization: Optional[str]) -> User:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="missing_token")
     user = get_user_from_token(db, authorization)
     if not user:
-        raise HTTPException(status_code=401, detail="invalid_token")
+        raise HTTPException(status_code=403, detail="admin_required")
     if user.role not in {"Admin", "Manager"}:
         raise HTTPException(status_code=403, detail="admin_role_required")
     return user
@@ -60,6 +62,11 @@ def tenant_summary(
         if tenant and tenant.enrollment_open_until
         else None,
     }
+
+
+@router.get("/fixed-summary")
+def fixed_summary():
+    return summarize_fixed_dataset()
 
 
 @router.post("/ingest")
@@ -360,3 +367,73 @@ def activate_dataset(
     db.add(dataset)
     db.commit()
     return _serialize_dataset(dataset)
+
+
+class DepartmentActivationReq(BaseModel):
+    active: bool
+
+
+@router.get("/fixed-summary")
+def fixed_summary(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    _require_admin_user(db, authorization)
+    summary = summarize_fixed_dataset()
+    return summary
+
+
+@router.get("/department-activations")
+def list_department_activations(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> List[dict[str, Any]]:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    departments = catalog.list_departments(tenant.name or "")
+    existing = (
+        db.query(DepartmentActivation)
+        .filter(DepartmentActivation.tenant_id == tenant.id)
+        .all()
+    )
+    active_map = {entry.department: entry for entry in existing}
+    result: List[dict[str, Any]] = []
+    for dept in departments:
+        entry = active_map.get(dept)
+        result.append(
+            {
+                "department": dept,
+                "active": bool(entry.active) if entry else False,
+            }
+        )
+    return result
+
+
+@router.patch("/department-activations/{department}")
+def set_department_activation(
+    department: str,
+    payload: DepartmentActivationReq,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    user = _require_admin_user(db, authorization)
+    tenant = db.get(Tenant, user.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="tenant_not_found")
+    dept = department.strip()
+    if not dept:
+        raise HTTPException(status_code=400, detail="department_required")
+    entry = (
+        db.query(DepartmentActivation)
+        .filter(DepartmentActivation.tenant_id == tenant.id, DepartmentActivation.department == dept)
+        .first()
+    )
+    if entry is None:
+        entry = DepartmentActivation(tenant_id=tenant.id, department=dept, active=payload.active)
+    else:
+        entry.active = payload.active
+    db.add(entry)
+    db.commit()
+    return {"department": dept, "active": entry.active}

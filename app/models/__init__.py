@@ -9,6 +9,7 @@ from .core import (
     CourseReview,
     CurriculumActivation,
     DataUpload,
+    DepartmentActivation,
     Enrollment,
     Policy,
     Project,
@@ -38,4 +39,5 @@ __all__ = [
     "CourseReview",
     "CurriculumActivation",
     "DataUpload",
+    "DepartmentActivation",
 ]

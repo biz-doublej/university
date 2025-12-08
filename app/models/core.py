@@ -160,6 +160,16 @@ class DataUpload(Base):
     activated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class DepartmentActivation(Base):
+    __tablename__ = "department_activations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    department: Mapped[str] = mapped_column(String(128))
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Project(Base):
     __tablename__ = "projects"
 

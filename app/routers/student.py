@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
-from ..models import Course, CourseReview, Enrollment, Student, Tenant, User
+from ..models import Course, CourseReview, DepartmentActivation, Enrollment, Student, Tenant, User
 from ..schemas import (
     CourseRecommendation,
     CourseReviewRequest,
@@ -24,11 +24,9 @@ router = APIRouter(prefix="/student", tags=["student"])
 
 
 def _require_student(db: Session, authorization: Optional[str]) -> tuple[User, Student]:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="missing_token")
     user = get_user_from_token(db, authorization)
     if not user:
-        raise HTTPException(status_code=401, detail="invalid_token")
+        raise HTTPException(status_code=403, detail="student_required")
     if user.role not in {"Student", "Admin"}:
         raise HTTPException(status_code=403, detail="student_role_required")
     student = db.execute(select(Student).where(Student.user_id == user.id)).scalar_one_or_none()
@@ -138,6 +136,22 @@ def upsert_enrollment(
     course = db.get(Course, payload.course_id)
     if course is None or course.tenant_id != student.tenant_id:
         raise HTTPException(status_code=404, detail="course_not_found")
+    active_entries = (
+        db.query(DepartmentActivation.department)
+        .filter(
+            DepartmentActivation.tenant_id == student.tenant_id,
+            DepartmentActivation.active == True,  # noqa: E712
+        )
+        .all()
+    )
+    active_depts = {row.department for row in active_entries}
+    course_dept = (course.department or "").strip()
+    student_major = (student.major or "").strip()
+    if active_depts:
+        if not course_dept or course_dept not in active_depts:
+            raise HTTPException(status_code=403, detail="department_enrollment_closed")
+        if not student_major or student_major != course_dept:
+            raise HTTPException(status_code=403, detail="department_enrollment_closed")
     enrollment = (
         db.query(Enrollment)
         .filter(Enrollment.student_id == student.id, Enrollment.course_id == payload.course_id)

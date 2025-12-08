@@ -8,6 +8,7 @@ from sqlalchemy.exc import OperationalError
 from .config import get_settings
 from .db import init_db, get_db
 from .models import Tenant
+from .services.fixed_seed import ensure_fixed_dataset
 from .routers import get_v1_router
 
 
@@ -37,11 +38,13 @@ def create_app() -> FastAPI:
                 db.rollback()
 
             stmt = select(Tenant).where(Tenant.name == settings.default_tenant_name)
-            existing = db.execute(stmt).scalar_one_or_none()
-            if existing is None:
+            tenant = db.execute(stmt).scalar_one_or_none()
+            if tenant is None:
                 tenant = Tenant(name=settings.default_tenant_name, timezone=settings.timezone, locale="ko")
                 db.add(tenant)
                 db.commit()
+                db.refresh(tenant)
+            ensure_fixed_dataset(db, tenant)
 
     app.include_router(get_v1_router())
 

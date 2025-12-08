@@ -18,6 +18,84 @@
 
 ---
 
+## PPT 제작용 핵심 메시지
+
+### 한눈에 보는 내러티브
+- "실습실 자동 배정 + 공실 수익화 + AI 운영 코파일럿"으로 캠퍼스 운영 효율을 실시간으로 높인다.
+- 멀티테넌트 SaaS로 여러 기관에 동시에 납품 가능한 확장성과 온프레 지원을 모두 준비했다.
+
+### Pain Point 스토리
+- 수작업 시간표 편성으로 인력 투입 대비 정확도와 추적 가능성이 낮다.
+- 공실 정보가 실시간으로 공유되지 않아 활용률이 떨어지고 외부 대여 수익화가 지연된다.
+- 데이터가 단절돼 운영팀·학과·외부 대여 담당 간 의사결정 속도가 느리다.
+
+### 해결 전략 (대표 기능 중심 슬라이드 구성)
+1. **실습실 및 실습센터 시간표 자동 배정**  
+   - OR-Tools 기반 제약 최적화 + 정책 DSL로 학과 규칙을 코드 없이 반영.  
+   - 하드 제약 0 위반과 예외 잠금 기능으로 재배정 시 혼선 최소화.
+2. **실시간 공실 분석 체계 및 활용률 시각화**  
+   - 센서/캘린더 데이터를 ETL 후 히트맵·트렌드 카드로 가동률을 즉시 확인.  
+   - 건물/학과 필터, Peak vs Off-peak 대비 지표를 PPT 차트로 바로 활용.
+3. **공실 기반 외부 대여 관리시스템 연동**  
+   - 공실 캘린더를 Google/Outlook, 외부 대여 포털과 API로 자동 발행.  
+   - 승인·정산 모듈(확장 옵션)로 내부·외부 예약을 단일 파이프라인에서 관리.
+4. **자체 AI 기능(Co-pilot & Explainability)**  
+   - 스케줄 결과 근거를 자연어 설명, 정책 변경을 대화형으로 수행.  
+   - 운영 지표를 바탕으로 "활용률 60%→85%" 등 예상 개선치를 자동 제안.
+
+### 기대 효과 슬라이드 예시
+- 운영 시간: 학기별 배정 준비 기간 4주 → 1주 이내로 단축.
+- 공간 효율: 공실률 20% 이상 기관에서 30% 이상 활용률 개선 사례 제시.
+- 재무 효과: 공실 대여 매출 가시화, KPI 카드/게이지 그래픽으로 표현 가능.
+- 투명성: AI 설명 기능으로 학과/기관별 의사결정 근거를 공유.
+
+### PPT 구성 가이드
+- 1p: 문제 정의 + 임팩트 수치.
+- 2p: 솔루션 맵(4대 대표 기능) + 흐름도.
+- 3p: 실시간 공실 분석/시각화 샘플 그래프.
+- 4p: 외부 대여 프로세스 + 수익화 구조.
+- 5p: AI Co-pilot 화면 캡처 + 기대 KPI.
+- 6p: 로드맵 & 멀티테넌트/온프레 옵션.
+
+---
+
+## 언어 · 기술 구성 하이라이트
+
+### Backend (Python · FastAPI)
+- Python 3.11 + FastAPI로 모든 API를 제공하며 `app/main.py`가 엔트리 포인트, `app/routers/*`가 REST/LLM/co-pilot 엔드포인트를 나눈다.
+- `app/models` 는 SQLAlchemy 2.x 모델/스키마, `app/services` 는 배정/인증/데이터 적재 로직으로 분리되어 도메인별 의존성을 관리한다.
+- 핵심 패키지: `fastapi`, `uvicorn[standard]`, `SQLAlchemy`, `pydantic[email]`, `python-multipart`, `PyYAML`, `openpyxl`, `pymysql`.
+- 최적화 엔진은 `ortools`(CP-SAT), `pulp`(LP) 모듈을 필요 시 옵션으로 설치하며, Co-pilot 로그 요약은 LLM 어댑터(FastAPI Background Task)로 구동한다.
+
+```
+app/
+ ├─ main.py
+ ├─ routers/
+ │   ├─ timetable.py      # 자동 배정·공실 API
+ │   ├─ tenant_admin.py   # 외부 대여/데이터 적재
+ │   └─ student|faculty   # 역할별 라우터
+ ├─ services/
+ │   ├─ auth.py           # 계정/세션 관리
+ │   ├─ fixed_dataset.py  # 데이터 정규화/적재
+ │   └─ fixed_seed.py     # 멀티테넌트 시드
+ └─ models/
+     └─ core.py           # ORM 모델·스키마
+```
+
+### Frontend (TypeScript · Next.js)
+- Next.js 14 + React 18 + TypeScript 5 조합으로 `app/` 라우팅을 활용, SSR/ISR로 관리자·학생·외부 교차 화면을 분리한다.
+- 스타일/빌드: Tailwind CSS, PostCSS, autoprefixer, ESLint + `eslint-config-next`, `typescript` 로 품질 검증.
+- CSV·XLSX 처리는 `xlsx`, API 호출은 `web/lib/server-api.ts` 경유(fetch wrapper), UI 컴포넌트는 `web/components/dashboards/*` 로 모듈화.
+- 프론트 빌드 스크립트는 `npm run dev|build|start|lint`, 환경 변수는 `NEXT_PUBLIC_API_BASE`, `NEXT_PUBLIC_TENANT_ID` 두 개로 단순화했다.
+
+### AI · 자동화 계층
+- **목적:** 실습실/강의실 자동 배정, 실시간 공실 예측·시각화, 외부 대여 창구 자동 발행, Co-pilot 기반 설명/정책 추천.
+- **구성:** OR-Tools CP-SAT + 정책 DSL로 배정안 생성, Redis/RQ 기반 비동기 작업 큐로 Solver 실행, LLM 어댑터가 최적화 로그를 자연어로 해설한다.
+- **데이터 흐름:** 학사·센서·캘린더 데이터 ETL → `tenants/rooms/assignments` 모델 저장 → AI 계층이 점수를 계산하고 `vacancy` API로 노출.
+- **활용 예:** 활용률 70% 미만 구간을 실시간 감지해 외부 대여 캘린더에 자동 게시, Co-pilot이 "왜 R401인가?" 질문에 근거를 설명하고 정책 재조정을 제안.
+
+---
+
 ## 1) 제품 비전 & USP
 
 * **비전:** 대학교·연구소·기업 러닝센터의 공간/시간 운영을 "AI 우선"으로 전환하여 **배정 품질↑, 공실률↓, 운영비↓**.
@@ -247,56 +325,7 @@ npm run dev
 
 - `NEXT_PUBLIC_API_BASE` (예: `http://localhost:8000`)
 - `NEXT_PUBLIC_TENANT_ID` (기본 `demo`)
-- `TIMETABLE_SESSION_TOKEN` (백엔드에서 발급받은 `tma.*` 세션 토큰; 학생/관리자 계정으로 API 호출 시 사용)
 - 클라우드 배포 준비 체크리스트: `docs/gcp-prep.md`
-
-#### TIMETABLE_SESSION_TOKEN 자동 발급
-
-- 서비스 계정 자격 정보(이메일/비밀번호)를 환경변수 `SERVICE_ACCOUNT_EMAIL`, `SERVICE_ACCOUNT_PASSWORD` 또는 CLI 인자로 전달합니다.
-- 필요하면 대학교/학과 정보도 `SERVICE_ACCOUNT_UNIVERSITY`, `SERVICE_ACCOUNT_DEPARTMENT`로 지정 가능합니다. (Student/Faculty 역할은 학과 필수)
-- `python scripts/bootstrap_service_token.py` 실행 시 다음 동작을 자동으로 수행합니다:
-  - 계정이 없으면 `/v1/auth/signup`으로 생성 (409면 무시)
-  - `/v1/auth/login`으로 세션 토큰을 발급받아 `.env`, `web/.env.local`에 `TIMETABLE_SESSION_TOKEN=` 값을 갱신
-- `--skip-env-write` 옵션으로 파일 수정 없이 토큰만 출력할 수 있으며, `--print-token`으로 항상 stdout 노출이 가능합니다.
-- 백엔드 베이스 URL이 다르면 `--api-base` 옵션을 사용하세요. (기본 `http://localhost:8000`)
-
-### API Key 발급/사용 (Timora AI)
-
-- 웹 포털: `http://localhost:3000/developers` (로그인 → 프로젝트 선택/생성 → API 키 발급)
-- Admin 토큰 설정: 서버 환경변수 `ADMIN_TOKEN="<임의의 강한 토큰>"`
-- 테넌트 생성:
-  - `POST /v1/admin/tenants` (헤더 `X-Admin-Token`) → `{ id, name }`
-- AI 포털 승인:
-  - `POST /v1/admin/tenants/{tenant_id}/ai_portal` { enabled } → 학교별 AI 포털 오픈 여부 제어
-- 프로젝트 생성:
-  - `POST /v1/admin/projects` (헤더 `X-Admin-Token`) → `{ id, tenant_id }`
-- API 키 발급:
-  - `POST /v1/admin/projects/{project_id}/keys` (헤더 `X-Admin-Token`) → `{ api_key: "timora_<prefix>.<secret>" }`
-  - 키는 발급 시 1회만 평문 노출됩니다. 서버에는 해시로 저장됩니다.
-- API 호출 시 인증 헤더(둘 중 하나):
-  - `X-API-Key: timora_<prefix>.<secret>`
-  - `Authorization: Bearer timora_<prefix>.<secret>`
-- 키에 연결된 테넌트가 자동으로 선택됩니다. `X-Tenant-ID`는 옵션(오버라이드 목적)입니다.
-- 키 유형: `api`(기본) / `ai`
-  - `api` : 통합 API 호출용 (개발자/통합 파트너)
-  - `ai`  : 승인된 학교 전용 AI 포털 오픈용, 포털 발급 스코프 포함
-
-### 사용자 가입/로그인 기반 발급 (요금제 없음)
-
-- 회원가입: `POST /v1/auth/signup` { email, password, role, university_name, department_name }
-  - 역할: Student / Faculty / Admin (학생·교수·관리자)
-  - `university_name`, `department_name`은 `data/한국대학교육협의회_대학별학과정보_20250108.csv` 기준 목록 검증
-  - 신규 테넌트는 선택한 대학교 명으로 자동 생성, 학생 회원은 학생 프로필 레코드 동시 생성
-- 로그인: `POST /v1/auth/login` { email, password } → 세션 토큰 반환
-- 내 정보: `GET /v1/auth/me` Authorization: Bearer tma.<payload>.<sig>
-- 대학교/학과 목록: `GET /v1/auth/catalog` → [{ university, departments[] }]
-- 개발자 엔드포인트(사용자 테넌트 한정):
-  - `POST /v1/dev/projects` { name } → 프로젝트 생성
-  - `GET /v1/dev/projects` → 내 테넌트 프로젝트 목록
-  - `POST /v1/dev/projects/{id}/keys` { name? } → API 키 발급(1회 노출)
-  - `GET /v1/dev/projects/{id}/keys` → 키 목록
-- 토큰 형식: 세션 토큰은 HMAC 서명된 tma.<payload>.<sig> (JWT 아님)
-- 환경변수: `AUTH_SECRET`(세션 토큰 서명), `API_KEY_PEPPER`(API 키 해시)
 
 ### 역할 기반 캠퍼스 API (학생/교원/대학 관리자)
 
@@ -345,7 +374,7 @@ npm run dev
 * **입력 데이터 결측/오류** → 강건한 ETL/검증 리포트, 자동 정규화.
 * **대규모 조합폭증** → 슬롯 그루핑, Warm start, 시간 제한 내 최적성 Gap 공개.
 * **조직 변화 저항** → Co‑pilot 설명/시뮬레이션으로 투명성 확보.
-* **캘린더 권한 이슈** → 최소권한 OAuth 범위, 토큰 로테이션.
+* **캘린더 권한 이슈** → 최소권한 OAuth 범위, 자격 증명 주기적 교체.
 
 ---
 

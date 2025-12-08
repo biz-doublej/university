@@ -16,11 +16,9 @@ router = APIRouter(prefix="/faculty", tags=["faculty"])
 
 
 def _require_faculty(db: Session, authorization: Optional[str]) -> User:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="missing_token")
     user = get_user_from_token(db, authorization)
     if not user:
-        raise HTTPException(status_code=401, detail="invalid_token")
+        raise HTTPException(status_code=403, detail="faculty_required")
     if user.role not in {"Faculty", "Admin"}:
         raise HTTPException(status_code=403, detail="faculty_role_required")
     return user

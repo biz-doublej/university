@@ -8,6 +8,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const CSV_FILENAME =
   "한국대학교육협의회_대학별학과정보_20250108.csv";
 const LEGACY_XLSX = "20250915_개설강좌조회(학생).xlsx";
+const DEFAULT_CAMPUS = process.env.NEXT_PUBLIC_DEFAULT_CAMPUS || "경복대학교 남양주 캠퍼스";
 
 function sanitizeRow(row: CsvRow): CsvRow {
   return Object.fromEntries(
@@ -70,7 +71,10 @@ export async function getUniversityNameFromData(schoolCode?: string | null) {
 
   if (!workbook) {
     const fallback = schoolCode?.trim();
-    return fallback && fallback.length > 0 ? fallback : "학교 정보 없음";
+    if (fallback && fallback.length > 0) {
+      return fallback;
+    }
+    return DEFAULT_CAMPUS;
   }
 
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -79,7 +83,10 @@ export async function getUniversityNameFromData(schoolCode?: string | null) {
   const name = extractUniversityName(rows, schoolCode);
   if (!name) {
     const fallback = schoolCode?.trim();
-    return fallback && fallback.length > 0 ? fallback : "학교 정보 없음";
+    if (fallback && fallback.length > 0) {
+      return fallback;
+    }
+    return DEFAULT_CAMPUS;
   }
 
   if (schoolCode) {

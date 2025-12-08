@@ -13,11 +13,9 @@ router = APIRouter(prefix="/dev", tags=["dev"])
 
 
 def _require_user(db: Session, authorization: str | None) -> User:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="missing_token")
     user = get_user_from_token(db, authorization)
     if not user:
-        raise HTTPException(status_code=401, detail="invalid_token")
+        raise HTTPException(status_code=403, detail="user_required")
     return user
 
 
